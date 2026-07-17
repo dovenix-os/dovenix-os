@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+# Workspace root. Members are added as crates land (see docs/src/dev/repo-layout.md).
+[workspace]
+resolver = "2"
+members = []
+
+[workspace.package]
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/dovenix-os/dovenix-os"

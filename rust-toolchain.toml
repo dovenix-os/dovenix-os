@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+# Pinned once real crates land; tracking stable until then.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
