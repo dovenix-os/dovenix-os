@@ -11,6 +11,7 @@
 
 - [Load-Bearing Principles](design/principles.md)
 - [Architecture Overview](design/architecture.md)
+- [Capability Model: Handles, Rights, Revocation](design/capabilities.md)
 - [Driver Wire Protocol](design/driver-wire-protocol.md)
   - [Class: block](design/classes/block.md)
   - [Class: net](design/classes/net.md)

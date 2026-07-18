@@ -34,6 +34,16 @@ bug to fix).
   subtree's reachable authority stays a subset of its spawner's at every
   delegation depth (this is what makes nested agents safe).
   → [Architecture: agents](architecture.md#agents-the-container-substrate-plus-a-grant-model)
+- **Attenuation is monotone and kernel-legible only**: rights can only shrink
+  along any duplicate/transfer chain — no amplification operation exists —
+  and semantic scoping (subtrees, hosts, rates) lives in interposition
+  proxies, never in kernel rights.
+  → [Capability model](capabilities.md#rights-kernel-legible-attenuation)
+- **Revocation is check-on-use against a Grant object, never a
+  derivation-tree walk**: tethered handles pay one read-mostly load on use,
+  revoke is a grant-graph walk plus a grace period, and to the revoked it
+  looks like peer reset with a never-retry class.
+  → [Capability model](capabilities.md#grants-revocation-as-an-object-not-a-tree-walk)
 - **IOMMU is mandatory for anything that touches DMA, with no bypass; its cost
   is defeated by the registration model (map at queue creation, never
   per-operation).** → [Architecture: DMA isolation](architecture.md#dma-isolation-and-the-registration-model)

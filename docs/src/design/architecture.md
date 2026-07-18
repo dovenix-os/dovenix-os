@@ -42,6 +42,7 @@ The Dovenix kernel is a capability-based, "microkernel-ish" kernel in Rust:
 | Event / Signal | Cheap async notification (data-plane doorbells) |
 | Interrupt | Userspace interrupt delivery to drivers |
 | IoRegion | MMIO/port access grant, IOMMU-constrained |
+| Grant | Revocation domain: handles tethered to it die when it is revoked — [capability model](capabilities.md#grants-revocation-as-an-object-not-a-tree-walk) |
 | VmDomain | A hardware virtual machine — [public hypervisor API](#virtualization-hypervisor-as-a-public-api); also hosts the Linux driver VM |
 
 ## System topology
@@ -350,8 +351,9 @@ delegation-by-subset is the native spawn path.
   capabilities, not merely fewer of them: a read-only view of a directory, a
   network cap valid only for named hosts, a rate-limited channel. Two
   mechanisms cover it. Kernel **handle rights** express what the kernel can
-  see (duplicate-with-fewer-rights: read-only, no-transfer; the exact rights
-  model is an [open question](#open-questions)). **Interposition proxies**
+  see (duplicate-with-fewer-rights: read-only, no-transfer; specified in the
+  [capability model](capabilities.md#rights-kernel-legible-attenuation)).
+  **Interposition proxies**
   express semantic attenuation the kernel cannot (filesystem subtree views,
   host filtering, rate limits) — the same machinery as
   [L2 record/replay](determinism.md#l2--component-recordreplay-interposition),
@@ -379,10 +381,12 @@ delegation-by-subset is the native spawn path.
   that is a complete, exactly-replayable audit of what the agent did.
   Forensics and "watch the agent" tooling fall out of the determinism
   machinery instead of a bolted-on audit subsystem.
-- **Revocation is the open problem.** Killing the `Job` subtree revokes
-  everything, coarsely, today. Yanking one grant mid-flight — and everything
-  derived from it down the tree — needs a real design decision
-  ([open question](#open-questions)).
+- **Revocation is a first-class object, not a tree walk.** Handles delegated
+  across a trust boundary are tethered to a `Grant`; revoking it kills that
+  grant and everything delegated beneath it, transitively, while the
+  delegatee keeps running. Full design — and the case against an seL4-style
+  derivation tree — in the
+  [capability model](capabilities.md#grants-revocation-as-an-object-not-a-tree-walk).
 
 ## Hardware integration: power as a lifecycle, not a bolt-on
 
@@ -442,16 +446,11 @@ trivial patches. This metric is a release gate, same as the performance benchmar
 
 ## Open questions
 
-- Exact kernel syscall surface and handle rights model (needs its own doc) —
-  including the exact shape of the POSIX-driven primitives: COW address-space
-  snapshot for `fork`, thread interruption for signals — and the
-  attenuation rights [agent delegation](#agents-the-container-substrate-plus-a-grant-model)
-  relies on (duplicate-with-fewer-rights).
-- Capability revocation for
-  [agent delegation](#agents-the-container-substrate-plus-a-grant-model): is
-  kill-the-`Job`-subtree enough, or is fine-grained mid-flight revocation
-  (revocable-by-indirection handles, or an seL4-style capability derivation
-  tree) worth its kernel cost?
+- Exact kernel syscall surface (needs its own doc) — including the exact
+  shape of the POSIX-driven primitives: COW address-space snapshot for
+  `fork`, thread interruption for signals. The rights and revocation
+  semantics it must implement are fixed by the
+  [capability model](capabilities.md).
 - MPK/PKS compartment policy: which regions get the 16-key budget, and is
   rung 2 ever promoted to a real security boundary (gadget scrubbing + CFI)?
   Own design doc due with the first servers (M2/M3) — see the
