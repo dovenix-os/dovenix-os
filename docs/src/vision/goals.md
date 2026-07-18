@@ -120,7 +120,9 @@ role.
 Docker/podman-style workflows are a design target, not a compatibility layer.
 Dovenix's architecture is
 [unusually well-shaped for this](../design/architecture.md#containers-namespaces-were-never-in-the-kernel-to-begin-with):
-the kernel has **no global namespaces** (all naming is userspace) and **no ambient authority** (all
+the kernel has
+[**no global namespaces**](../design/capabilities.md#no-global-namespaces-handle-acquisition-is-closed)
+(all naming is userspace) and **no ambient authority** (all
 access is via granted handles), so a "container" is simply a process tree started
 with a different namespace map and a bounded resource budget — the isolation
 primitive the whole OS is built on, not a bolted-on kernel feature like Linux

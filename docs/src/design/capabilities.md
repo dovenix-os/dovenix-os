@@ -2,8 +2,9 @@
 
 This chapter resolves two questions the
 [agent model](architecture.md#agents-the-container-substrate-plus-a-grant-model)
-left open: what a *weakened* handle is (the rights model) and how a grant is
-*taken back* (revocation). It is normative for the future syscall-surface
+left open — what a *weakened* handle is (the rights model) and how a grant is
+*taken back* (revocation) — and states the acquisition rules behind the
+kernel-philosophy line "no global namespaces in the kernel". It is normative for the future syscall-surface
 document — the exact syscall names and constants land there, but they must
 implement the semantics here.
 
@@ -20,6 +21,54 @@ so handles are unforgeable and everything below is enforced at the syscall
 boundary. The table entry is one cache line; rights and tether checks read
 the same line the handle lookup already fetched, so their marginal cost on
 the hot path is a predictable branch, not a memory access.
+
+## No global namespaces: handle acquisition is closed
+
+"No global namespaces in the kernel; namespaces are a userspace concern"
+([kernel philosophy](architecture.md#kernel-philosophy-zircon-inspired-hardware-enforced))
+is not a style preference — it is two enforceable rules of the handle model.
+
+**Rule 1 — the kernel resolves no names.** No syscall takes a name — a path,
+a string, a registered port, a well-known identifier of any kind — and
+returns a handle. There is no kernel registry to publish into or look up
+from. A process acquires a handle in exactly four ways, and no fifth may
+ever be added:
+
+1. **Create** a new kernel object (full rights for the type, to the creator);
+2. **Duplicate** a handle it already holds (rights a subset of the source);
+3. **Receive** a handle in a channel message;
+4. **Spawn**: receive the startup handle set its spawner assembled.
+
+Every path except creation starts from a handle some process already held,
+and the base case is the root server, which receives the initial handle set
+from the kernel at [boot](architecture.md#boot-path). So the acquisition
+graph is rooted in explicit grants: tracing any handle backwards ends in
+the spawn chain, never in a lookup. This closure is what makes
+[monotone attenuation](#rights-kernel-legible-attenuation) mean something —
+a kernel name service would be the backdoor around it, because a process's
+maximum reach would become "everything nameable" rather than "everything
+granted".
+
+**Rule 2 — identity is not authority.** Kernel objects may carry global
+identifiers (koids) for accounting, tracing, and debugging. These are pure
+data: no operation converts an identifier back into a handle, so learning
+an object's koid grants nothing. Introspection and debugging tools acquire
+their handles the same four ways as everyone else.
+
+"Namespaces are a userspace concern" is the constructive half: every name
+in the system — file paths, service names, device paths, network
+identities, POSIX-visible PIDs — is a userspace server's *interpretation*
+of the requesting connection's
+[namespace map](architecture.md#containers-namespaces-were-never-in-the-kernel-to-begin-with).
+To the kernel, a namespace map is opaque data passed at spawn (its format
+and handoff ABI are a
+[tracked open question](architecture.md#open-questions)). Name resolution
+is therefore always *scoped*: a server answering a lookup derives the
+result from that connection's map — never from a global table, per the
+[no-oracle rule](architecture.md#agents-the-container-substrate-plus-a-grant-model).
+The consequences the rest of the book stands on — containers with no
+"namespace escape" attack class, agent delegation bounded at every depth,
+the per-process Unix world view — all reduce to these two rules.
 
 ## Rights: kernel-legible attenuation
 

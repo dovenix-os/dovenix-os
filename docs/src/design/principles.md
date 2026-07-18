@@ -28,6 +28,11 @@ bug to fix).
   granted.** Handles are the only authority; for drivers, all device authority
   arrives at `BIND`. → [Architecture](architecture.md),
   [DWP §6.1](driver-wire-protocol.md)
+- **The kernel resolves no names: handle acquisition is closed** (create,
+  duplicate, receive over a channel, spawn-time handle set — no fifth way may
+  ever be added), and object identity (koids) never converts back into a
+  handle. All naming is userspace interpretation of namespace maps.
+  → [Capability model](capabilities.md#no-global-namespaces-handle-acquisition-is-closed)
 - **Authority is what a process can reach, not what it holds: system servers
   are never ambient-authority oracles.** Whatever an endpoint hands out is
   derived from the requesting connection's namespace map, so a spawned
@@ -106,7 +111,8 @@ bug to fix).
   → [Architecture: POSIX strategy](architecture.md)
 - **Per-process namespace maps provide the entire Unix world view — and are
   the container substrate.** No global names anywhere.
-  → [Architecture](architecture.md)
+  → [Architecture](architecture.md),
+  [Capability model](capabilities.md#no-global-namespaces-handle-acquisition-is-closed)
 
 ## Structure and testing
 

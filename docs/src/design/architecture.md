@@ -13,7 +13,10 @@ The Dovenix kernel is a capability-based, "microkernel-ish" kernel in Rust:
   filesystems, network protocols, POSIX personality) lives in userspace.
 - **Everything is a handle.** Processes hold unforgeable capability handles to kernel
   objects (address spaces, threads, memory objects, channels, interrupts, device
-  resources). No global namespaces in the kernel; namespaces are a userspace concern.
+  resources).
+  [No global namespaces in the kernel](capabilities.md#no-global-namespaces-handle-acquisition-is-closed):
+  handle acquisition is a closed set of explicit grants, and all naming is
+  userspace interpretation of per-process namespace maps.
 - **Hardware does the enforcement.**
   [IOMMU for DMA isolation](#dma-isolation-and-the-registration-model),
   [virtualization extensions for untrusted driver domains](#virtualization-hypervisor-as-a-public-api),
@@ -317,7 +320,9 @@ Dovenix gets Docker/podman-class containerization without a dedicated kernel
 subsystem, because the two things Linux had to retrofit are the native primitives
 here:
 
-- **Namespacing**: the kernel has no global names — a process sees exactly the
+- **Namespacing**: the kernel
+  [has no global names](capabilities.md#no-global-namespaces-handle-acquisition-is-closed)
+  — a process sees exactly the
   namespace map (filesystem view, services, network identity) its parent handed it
   at spawn. A container is just a process tree given a different map. There is no
   "escape the namespace" attack class, because there is no global namespace to
