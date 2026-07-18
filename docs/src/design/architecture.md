@@ -128,15 +128,52 @@ here:
 - The Linux driver VM participates: it receives suspend notifications like any
   other component, using Linux's own PM for the devices it fronts.
 
-## POSIX strategy
+## POSIX strategy: first-class, ports without unnecessary change
 
-POSIX is a personality, not the core: servers speak Dovenix-native protocols;
-`posixd` + the C library (mlibc or a fork) translate. This keeps POSIX completeness a
-compatibility metric rather than an architectural constraint.
+Easy porting of existing Linux/BSD/macOS software — the target is
+`./configure && make` with zero or trivial patches — is a stated objective. This is
+where Dovenix **deliberately departs from Fuchsia**: Zircon treats POSIX as an
+emulation detail ("POSIX-lite": no `fork`, no signals, no real ptys), and the
+consequence is that bringing software to Fuchsia is a rewrite. Dovenix keeps the
+capability-native core but inverts the priority at the boundary:
+
+- **Capability-native underneath.** Servers speak Dovenix protocols; naming is
+  per-process namespace maps; nothing in the core *requires* POSIX.
+- **POSIX-complete at the libc boundary.** mlibc (born from Managarm, built for
+  exactly this kind of OS) is the primary interface for ported software; `posixd`
+  and `vfsd` are designed around POSIX semantics from day one, not adapted to them
+  later.
+- **POSIX is allowed to shape kernel primitives.** Where the Zircon model conflicts
+  with efficient, correct POSIX, POSIX wins:
+
+| POSIX requirement | Design concession |
+|---|---|
+| `fork()` | COW address-space snapshot as a kernel operation. Zircon refuses this; we don't. `posix_spawn` is the preferred fast path, but `fork` must be *correct*, because ported software uses it. |
+| Signals | An asynchronous thread-interruption/redirection primitive (not just Zircon-style suspend + exception ports). |
+| File-backed `mmap` | VMO-backed file mappings served by `vfsd`, coherent with `read`/`write`. |
+| `select`/`poll`/`epoll`/`kqueue` | Readiness signaling is native in every server protocol, so polling APIs are thin, not emulated with helper threads. |
+| Filesystem semantics | `vfsd` implements POSIX natively: permissions, hardlinks, atomic `rename`, unlink-while-open. Not emulation over an alien model. |
+| Ptys, UNIX sockets, sessions/process groups/job control | First-class in `posixd`, because shells, terminals, and build systems are the first things ported. |
+
+- **The namespace map is what provides the Unix world.** `/`, `/dev`, a minimal
+  `/proc`, mounts — assembled per-process from the map. Ported software sees a
+  normal Unix; the same mechanism is the container substrate. (Plan 9 proved this
+  duality; Fuchsia uses it too — the difference is we commit to a *complete* Unix
+  view.)
+- **Precedent that this works**: Managarm — userspace-server OS with working
+  `fork`, signals, `epoll`, ptys — runs Wayland, X, and real ported packages via
+  mlibc. The pattern is proven; Dovenix's twist is the hardware-enforcement and
+  live-update machinery underneath it.
+
+**Porting metric (tracked from M3)**: a named package set (sqlite, openssh, git,
+tmux, nginx, curl, …) must build and pass its own test suite unpatched or with
+trivial patches. This metric is a release gate, same as the performance benchmark.
 
 ## Open questions
 
-- Exact kernel syscall surface and handle rights model (needs its own doc).
+- Exact kernel syscall surface and handle rights model (needs its own doc) —
+  including the exact shape of the POSIX-driven primitives: COW address-space
+  snapshot for `fork`, thread interruption for signals.
 - MPK/PKS compartment policy: which same-address-space boundaries are worth it?
 - Scheduler design for the Linux-benchmark goal (needs its own doc).
 - Filesystem choice for M3/M4 (port vs. new; candidates: FAT for boot, then a

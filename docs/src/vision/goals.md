@@ -83,6 +83,20 @@ primitive the whole OS is built on, not a bolted-on kernel feature like Linux
 namespaces. OCI image and runtime compatibility is the goal so existing
 container tooling and registries work.
 
+### Easy porting of existing software (POSIX-first)
+
+Existing Linux/BSD/macOS software must port **without unnecessary change** — the
+target is `./configure && make` (or `cargo build`, `cmake`, …) with zero or trivial
+patches. This is a deliberate divergence from the Fuchsia philosophy: where the
+Zircon-style model conflicts with correct, efficient POSIX (`fork`, signals,
+file-backed `mmap`, filesystem semantics, ptys/job control), **POSIX wins at the
+boundary** and is allowed to shape kernel primitives. The capability model stays
+underneath; per-process namespace maps provide the complete Unix world view. See
+the [POSIX strategy](../design/architecture.md#posix-strategy-first-class-ports-without-unnecessary-change).
+Porting success is measured by a named package set building unpatched (release
+gate from M3). Linux *binary* compatibility remains a non-goal for now — source
+compatibility is the commitment.
+
 ### Proper hardware integration
 
 Daily-driver means the machine behaves like a laptop/desktop should: ACPI

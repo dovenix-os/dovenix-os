@@ -20,6 +20,10 @@ security as the first design input rather than a retrofit. The design center:
 - **Zircon-inspired, not Zircon-derived.** The kernel follows the pragmatic
   "microkernel-ish" philosophy of capability handles and a small-but-not-ascetic kernel
   boundary, implemented fresh in Rust under permissive licenses.
+- **POSIX is first-class, unlike Fuchsia.** Existing Linux/BSD/macOS software must
+  port without unnecessary change (`./configure && make`, zero or trivial patches).
+  Where the Zircon model conflicts with correct POSIX (`fork`, signals, filesystem
+  semantics), POSIX wins at the boundary; the capability model stays underneath.
 - **Linux as the performance benchmark.** Speed and resource efficiency are measured
   against the Linux kernel, not against other microkernels.
 

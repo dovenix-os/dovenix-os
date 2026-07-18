@@ -28,6 +28,9 @@
 - mlibc (or fork) port; VFS server; initial FS (read-only first, then writable).
 - Network stack (candidate: port of a permissively-licensed stack, e.g. smoltcp).
 - Shell and coreutils (BSD-derived) run. The system is self-hosting for tests.
+- Porting gate begins: the named package set (sqlite, curl, git, tmux, openssh,
+  nginx, …) builds and passes its own test suites unpatched or with trivial
+  patches. `fork`, signals, ptys, and job control work — real shells are the proof.
 
 ## M4 — Real hardware, Linux driver VM
 

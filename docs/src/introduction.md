@@ -12,6 +12,11 @@ permissive licenses (`Apache-2.0 OR MIT`), drawing on seL4's security literature
 and on Redox and Managarm as existence proofs that a small team can ship a
 Rust-based POSIX-capable OS.
 
+One deliberate departure from Fuchsia: **POSIX is first-class, not an emulation
+detail.** Existing Linux/BSD/macOS software must port without unnecessary change,
+and where Zircon's model conflicts with that (`fork`, signals, POSIX filesystem
+semantics), POSIX wins at the boundary — the capability model stays underneath.
+
 ## Where the project is today
 
 Design phase. The documents in this book are the current output of the project, in
