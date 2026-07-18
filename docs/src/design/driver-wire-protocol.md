@@ -179,7 +179,7 @@ schemas + queue layouts + retry semantics, layered on the core. Initial classes:
 | Class | v0 scope | First implementation |
 |---|---|---|
 | [`block`](classes/block.md) | read/write/flush/discard/write-zeroes, FUA + flush ordering (no barriers), geometry | virtio-blk, then NVMe |
-| `net` | tx/rx queues, MAC/link status, offload negotiation | virtio-net |
+| [`net`](classes/net.md) | tx/rx queues, MAC/link/MTU/filters, csum/TSO offload, loss-not-corruption contract | virtio-net |
 | `input` | event stream (evdev-inspired semantics) | virtio-input |
 | `console` | byte stream + resize | virtio-console, serial |
 | `bus` | enumerate children, grant resources (devmgr delegate) | PCIe |
