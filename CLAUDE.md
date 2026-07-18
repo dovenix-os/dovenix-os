@@ -57,8 +57,12 @@ product's safety mechanism; skipping one is never a favor.
 4. **Phase completion protocol**, in order, before asking for review:
    a. **Audit** the phase's work, in this order: first **reliability** (no
       silent failures, errors propagated or handled deliberately, resources
-      cleaned up on all paths) and **Rust-native idioms** (clippy-clean, no
-      C-brain patterns, ownership expresses the design), applying fixes; then
+      cleaned up on all paths), **Rust-native idioms** (clippy-clean, no
+      C-brain patterns, ownership expresses the design), and **performance
+      mistakes** (unnecessary copies/clones and allocations, needless heap
+      round-trips, work on hot paths that belongs at setup time, accidental
+      O(n²), lock scope wider than needed — goal 3 is benchmarked against
+      Linux, so casual waste is a bug), applying fixes; then
       **security last** (unsafe blocks justified and minimal, all external
       input validated, capability scope not widened), so it reviews the code
       as it will actually ship — a security pass is invalidated by any fix

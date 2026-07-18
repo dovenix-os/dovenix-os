@@ -19,9 +19,9 @@ For milestones, quote the roadmap entry.>
 ## Order of work
 
 <Every phase ends at a human checkpoint: run the phase-completion protocol in
-CLAUDE.md (audit — reliability and Rust idioms first, security last, on the
-final code → update docs and docstrings and confirm them → pause for human
-review). Do not start the next phase unreviewed.>
+CLAUDE.md (audit — reliability, Rust idioms, and performance first, security
+last, on the final code → update docs and docstrings and confirm them → pause
+for human review). Do not start the next phase unreviewed.>
 
 ### Phase 1 — <name>
 
