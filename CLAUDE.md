@@ -7,10 +7,15 @@ userspace drivers/servers, POSIX-first compatibility. Pre-alpha; specs lead code
 
 1. `docs/src/vision/goals.md` — priority-ordered goals; trade-offs resolve by
    this order, not taste.
-2. The design doc for whatever you're touching (`docs/src/design/`). The book
+2. `docs/src/design/principles.md` — the **index of load-bearing principles**,
+   one line each with links. Skim it before any design-adjacent decision; if
+   an entry bears on your decision, follow its link first. If your change
+   introduces or alters a load-bearing principle, update the index in the
+   same PR.
+3. The design doc for whatever you're touching (`docs/src/design/`). The book
    is **normative**: if code or plan disagrees with it, the book wins — change
    the book first (same PR) or conform.
-3. The **active plan** in `plans/` (exactly one milestone plan has
+4. The **active plan** in `plans/` (exactly one milestone plan has
    `status: active`) — it sequences the work and tracks status. Update it in
    the same commit that changes reality. See `plans/README.md`.
 

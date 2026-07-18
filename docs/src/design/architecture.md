@@ -72,6 +72,58 @@ The Dovenix kernel is a capability-based, "microkernel-ish" kernel in Rust:
   devices to Dovenix as virtio devices, which Dovenix consumes with its own native
   virtio drivers. This makes real desktop hardware usable from day one.
 
+## DMA isolation and the registration model
+
+**Why the IOMMU is mandatory.** DMA bypasses the CPU's MMU: an unconstrained
+device can read or write *any* physical memory. Without IOMMU enforcement,
+driver process isolation is fiction — a compromised driver simply programs its
+device to DMA over kernel memory, and no CPU-side mechanism ever sees it
+(malicious peripherals — Thunderbolt/PCILeech-class attacks — do the same
+without any driver compromise). The IOMMU (VT-d/AMD-Vi/SMMU) is an MMU for
+devices: per-device page tables on every DMA. With it, a `BIND` grant is
+hardware-enforced on **both** sides of a driver — the MMU bounds the process,
+the IOMMU bounds its device to exactly the granted data VMOs. Three pillars of
+this book stand on that: driver crash/compromise containment, the GPL-island
+trust story, and the safety of Linux-driver-VM device passthrough. Hence the
+non-goal: no support for DMA-capable hardware without an IOMMU.
+
+**The cost model — and why we don't pay the famous part.** IOMMU overhead has
+two distinct components:
+
+1. *Translation*: IOTLB hits are free; misses add a page-table walk (hundreds
+   of ns) to that DMA. Mitigated with large-page-backed, contiguous VMOs.
+2. *Map/unmap*: creating mappings writes page tables; destroying them forces
+   IOTLB invalidation — slow and synchronizing. The traditional streaming-DMA
+   model (map before each I/O, unmap after) pays this **per operation**; it is
+   why high-rate NICs historically ran `iommu=off` or "lazy" invalidation
+   modes that trade a security window for throughput.
+
+Dovenix avoids cost 2 **structurally**: data VMOs are IOMMU-mapped **once, at
+queue creation** (DWP core §8.1), descriptors reference offsets within those
+long-lived mappings, and no hot path ever touches IOMMU state — teardown and
+rebind happen at session end or under quiesce, off the fast path. This is the
+registration model RDMA, DPDK, and io_uring's registered buffers converged on;
+the DWP queue design requires declared, long-lived shared memory anyway (as
+does [determinism](determinism.md) §4.1 — the constraints rhyme), so the fast
+mapping model falls out of the architecture rather than fighting it.
+
+**No bypass exists.** Nondeterminism escape hatches (`mem.shared-fast`,
+`sched.poll`) relax *observability*, never DMA containment; there is no
+`iommu=off`. Security is goal 1, speed is goal 3 — the answer to IOMMU cost is
+the registration model, not a hole in the foundation.
+
+**Worked check — the pro-audio deadline.** Audio is the easiest DMA client in
+the system despite the hardest deadline: ~384 KB/s bandwidth, one tiny ring
+buffer cyclically re-DMA'd for the whole session — mapped once, one
+permanently hot IOTLB entry (or a single 2 MB page). Even a worst-case IOTLB
+walk is ≲0.1% of a 0.7 ms period budget. The IOMMU is a non-factor for the
+zero-XRun benchmark *because of* the registration model; the real deadline
+risks (wakeup latency, priority inversion, page faults, SMIs) are addressed in
+[Determinism §5.1](determinism.md). The residual case where IOMMU cost stays
+measurable even with registration — extreme small-packet networking at
+100G-class rates (IOTLB pressure) — is an M4+ tuning problem (page sizes,
+IOVA layout), not an architectural one.
+
 ## Boot path
 
 ```

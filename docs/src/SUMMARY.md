@@ -9,6 +9,7 @@
 
 # Design
 
+- [Load-Bearing Principles](design/principles.md)
 - [Architecture Overview](design/architecture.md)
 - [Driver Wire Protocol](design/driver-wire-protocol.md)
   - [Class: block](design/classes/block.md)
