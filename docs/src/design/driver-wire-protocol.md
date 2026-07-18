@@ -242,8 +242,8 @@ core, §8) + retry semantics, layered on the core. Initial classes:
 |---|---|---|
 | [`block`](classes/block.md) | read/write/flush/discard/write-zeroes, FUA + flush ordering (no barriers), geometry | virtio-blk, then NVMe |
 | [`net`](classes/net.md) | tx/rx queues, MAC/link/MTU/filters, csum/TSO offload, loss-not-corruption contract | virtio-net |
-| `input` | event stream (evdev-inspired semantics) | virtio-input |
-| `console` | byte stream + resize | virtio-console, serial |
+| [`input`](classes/input.md) | credit-based inline event stream, evdev-inspired vocabulary, state resync | virtio-input |
+| [`console`](classes/console.md) | reliable ordered byte stream, UART params, resize/break events | serial (M1), virtio-console |
 | `bus` | enumerate children, grant resources (devmgr delegate) | PCIe |
 | `display` | modeset + framebuffer present (deliberately minimal) | virtio-gpu |
 | `battery` | charge state, health, charge-control (powerd client) | ACPI battery |

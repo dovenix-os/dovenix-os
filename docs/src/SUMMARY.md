@@ -13,6 +13,8 @@
 - [Driver Wire Protocol](design/driver-wire-protocol.md)
   - [Class: block](design/classes/block.md)
   - [Class: net](design/classes/net.md)
+  - [Class: input](design/classes/input.md)
+  - [Class: console](design/classes/console.md)
 - [Licensing Model](design/licensing.md)
 
 # Development
