@@ -80,11 +80,11 @@ struct NetQueueCreate {
     depth: u16,
     data_vmo_count: u16,
 }
-// handles: ring VMO, submit-doorbell Event, complete-doorbell Event, data VMOs
+// attached handles: canonical queue order (DWP core §8.1)
 ```
 
-A functioning interface needs one TX and one RX queue. Both use the same
-submission-ring + completion-ring machinery as `block` — the *meaning* differs:
+A functioning interface needs one TX and one RX queue. Both are generic queues
+(DWP core §8) — only the *meaning* of the rings differs:
 
 - **TX**: submission = filled frames to transmit; completion = frame sent (buffer
   reusable).
@@ -100,9 +100,8 @@ submission-ring + completion-ring machinery as `block` — the *meaning* differs
 
 ## 4. Data plane
 
-Ring VMO layout is identical in shape to `block` §4 (header page with four
-cache-line-separated indices, then submission ring, then completion ring), with
-net-specific 32-byte descriptors and 16-byte completions:
+Queue machinery is the generic queue spec (DWP core §8). `net` defines
+**32-byte submission descriptors** and a **16-byte completion entry**:
 
 ```rust
 struct NetTxDesc {
@@ -136,8 +135,8 @@ struct NetCompletion {
 }
 ```
 
-Rules (deltas from `block` §4 — everything not restated carries over, including
-adversarial validation and index-comparison-as-ground-truth):
+Class-specific rules (generic rules — req_id echo, adversarial validation,
+index ground truth — are DWP core §8):
 
 - **Single contiguous segment per frame** in v0, including TSO aggregates (so RX
   buffers for TSO-negotiated sessions must be sized for aggregates; the

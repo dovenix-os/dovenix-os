@@ -155,26 +155,88 @@ specified per-message in the class IDL, not left to client guesswork.
   transition, drivers serve N and N-1. This is what makes live-updating a client
   and its driver independently possible.
 
-## 8. Data plane: rings
+## 8. Data plane: generic queues
 
 Bulk data (block I/O, packets, frames, input events at rate) moves over shared
-memory, virtio-inspired:
+memory, virtio-inspired. The queue machinery — memory layout, index discipline,
+doorbells, validation — is defined **once, here**, and implemented once
+(`libs/dwp`, shared and fuzz-hardened). A driver class contributes only its
+descriptor/completion entry formats and the semantics of its operations.
 
-- A *queue* = one VMO (ring descriptors + buffers) + one Event pair (doorbells),
-  created by the client, granted to the driver at class-specific queue setup.
-- Descriptor rings with explicit producer/consumer indices; single-producer,
-  single-consumer per direction.
-- Doorbells are edge signals; both sides MUST tolerate spurious wakeups and use
-  index comparison as ground truth (enables interrupt mitigation / polling modes).
-- Queue memory layout is versioned with the driver class that defines it.
-- **Trust rule**: each side validates ring state as adversarial. A driver host must
-  not be crashable by a hostile client ring, and vice versa — rings cross both a
-  fault boundary and (for GPL islands and VM-backed drivers) a trust boundary.
+### 8.1 Queue anatomy
+
+A *queue* = one ring VMO + one doorbell Event pair + zero or more data VMOs,
+created by the client and granted to the driver in a class-specific
+`*_QUEUE_CREATE` message, with handles in this canonical order:
+
+```text
+[0]   ring VMO
+[1]   submit doorbell Event    (client → driver)
+[2]   complete doorbell Event  (driver → client)
+[3..] data VMOs                (bulk buffers; DMA-granted via IOMMU)
+```
+
+Every queue is a **submission ring + completion ring** pair. What the entries
+*mean* is a class concern (a block submission is an I/O request; a net RX
+submission is an empty buffer being posted) — the machinery is identical.
+
+### 8.2 Ring VMO layout
+
+Page-aligned:
+
+```text
+header page:
+  0     u32  submit_producer     (client-written)
+  64    u32  submit_consumer     (driver-written)
+  128   u32  complete_producer   (driver-written)
+  192   u32  complete_consumer   (client-written)
+submission ring:  depth × S-byte class descriptor
+completion ring:  depth × C-byte class completion entry
+```
+
+- `depth` is a power of two, negotiated at queue creation.
+- Each index owns a cache line; single producer / single consumer per index.
+- Indices are free-running (monotonic), masked by `depth - 1` to a slot —
+  full vs. empty is unambiguous without a wasted slot.
+- `S` and `C` are fixed constants of the class (per major class version).
+
+### 8.3 Descriptor conventions
+
+- Every submission's first field is a client-chosen `req_id: u64`, unique among
+  in-flight entries on that queue; every completion echoes it.
+- Completions may be delivered out of submission order. Any stronger ordering
+  guarantee is stated explicitly by the class, never assumed.
+- Unknown flag bits MUST be zero on submission and MUST produce an error
+  completion — never a crash, never silent acceptance.
+
+### 8.4 Doorbells
+
+Edge signals, both directions. Both sides MUST tolerate spurious wakeups and
+coalesced edges: **index comparison is ground truth**. This is what makes
+polling mode and interrupt mitigation configuration-free client policies.
+
+### 8.5 Trust and validation
+
+Each side treats ring and descriptor contents as **adversarial** — rings cross
+a fault boundary and (for GPL islands and VM-backed drivers) a trust boundary.
+The consumer re-validates every field at consumption time (opcodes, ranges,
+alignment, data-VMO bounds). A malformed descriptor produces an error
+completion; a corrupt index (out of window, regressing) costs the offender the
+session. Neither side may be crashable, blockable, or hangable by the other's
+ring behavior.
+
+### 8.6 Versioning
+
+This section's layout is versioned with the **core protocol**. Descriptor and
+completion formats are versioned with their **class** (per §7: class minor
+versions may only append meaning via flag/reserved fields — entry sizes are
+fixed per major class version).
 
 ## 9. Driver classes
 
-The core protocol is class-agnostic. A *driver class* = a `msg_type` namespace + payload
-schemas + queue layouts + retry semantics, layered on the core. Initial classes:
+The core protocol is class-agnostic. A *driver class* = a `msg_type` namespace +
+payload schemas + queue descriptor/completion formats (the machinery itself is
+core, §8) + retry semantics, layered on the core. Initial classes:
 
 | Class | v0 scope | First implementation |
 |---|---|---|

@@ -74,11 +74,8 @@ struct BlkQueueCreate {
     data_vmo_count: u16,
     _reserved: u16,
 }
-// attached handles, in order:
-//   [0] ring VMO        (layout: §4)
-//   [1] doorbell Event  (client → driver: "requests available")
-//   [2] completion Event(driver → client: "completions available")
-//   [3..] data VMOs     (read/write-mapped by driver; DMA-granted via IOMMU)
+// attached handles: canonical queue order (DWP core §8.1) —
+//   ring VMO, submit doorbell, complete doorbell, data VMOs
 ```
 
 The driver validates the ring VMO size against `depth`, maps everything, and
@@ -91,21 +88,11 @@ responds. `BLK_QUEUE_DESTROY(queue_id)` tears it down after draining.
 | `BLK_EV_CAPACITY_CHANGED { capacity_blocks }` | Device resized (client re-runs `GET_INFO`) |
 | `BLK_EV_MEDIA_CHANGED` | Removable media swap; all cached state invalid |
 
-## 4. Data plane (ring layout, per DWP §8)
+## 4. Data plane
 
-One queue = one ring VMO + registered data VMOs + one doorbell Event pair. The
-ring VMO layout, page-aligned:
-
-```text
-header page:
-  0   u32  req_producer      (client-written)
-  4   u32  req_consumer      (driver-written)
-  8   u32  comp_producer     (driver-written)
-  12  u32  comp_consumer     (client-written)
-  (each index in its own cache line; monotonically increasing, masked by depth)
-request ring:    depth × 64-byte BlkRequest
-completion ring: depth × 16-byte BlkCompletion
-```
+Queue machinery — ring VMO layout, index discipline, doorbells, adversarial
+validation — is the generic queue spec (DWP core §8). `block` defines a
+**64-byte submission descriptor** and **16-byte completion entry**:
 
 ```rust
 struct BlkRequest {
@@ -131,21 +118,18 @@ struct BlkCompletion {
 Opcodes: `BLK_OP_READ`, `BLK_OP_WRITE`, `BLK_OP_FLUSH`, `BLK_OP_DISCARD`,
 `BLK_OP_WRITE_ZEROES`. For `FLUSH`, `lba`/`block_count`/data fields are zero.
 
-Rules:
+Class-specific rules (the generic rules — req_id echo, out-of-order
+completions, adversarial validation, index ground truth — are DWP core §8):
 
 - **Single contiguous data segment per request** in v0 (no SGL). Clients coalesce
   or split; vectored I/O revisited with real measurements (§9).
-- Single producer / single consumer per ring direction; doorbells are edge
-  signals; **index comparison is ground truth** (spurious wakeups tolerated,
-  enables polling and interrupt mitigation).
-- Both sides treat ring contents as **adversarial** (DWP §8): the driver
-  re-validates every descriptor (opcode, ranges, alignment, VMO bounds) at
-  consumption time; a malformed descriptor completes with an error, it never
-  faults the driver. Out-of-range indices cost the client its session.
-- Completions may be reordered relative to submissions. **There is no implicit
-  inter-request ordering** — no barriers. Ordering is expressed only via
-  completion-then-submit and `FLUSH`/FUA (§5). (Matches modern Linux practice;
-  barrier requests were removed from the block layer for good reason.)
+- Driver-side validation per core §8.5 covers: opcode known, LBA range within
+  capacity, `block_count` ≤ `max_transfer_blocks`, `data_offset` logical-block
+  aligned and within the named data VMO.
+- **There is no implicit inter-request ordering** — no barriers. Ordering is
+  expressed only via completion-then-submit and `FLUSH`/FUA (§5). (Matches
+  modern Linux practice; barrier requests were removed from the block layer for
+  good reason.)
 
 ## 5. Durability contract
 
