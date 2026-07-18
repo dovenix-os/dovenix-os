@@ -57,6 +57,41 @@ Components are developed, tested, versioned, and shipped independently. The same
 component set reconfigures into server, desktop, or mobile products. The monorepo is
 structured so any component can be split out without surgery.
 
+## First-class platform capabilities
+
+These are not priorities that trade off against each other like the list above —
+they are feature commitments that must be designed in from the start, because each
+one is cheap if native and miserable if retrofitted:
+
+### Hardware virtualization, natively
+
+The kernel already runs a hypervisor (VT-x/EPT, ARM EL2) for the Linux driver VM
+and for isolating untrusted driver domains. That machinery is exposed as a
+**public, first-class API** (the `VmDomain` kernel object), not kept as internal
+plumbing — making Dovenix a type-1 hypervisor by construction. Running guest VMs
+(Linux, others) is a supported product feature on desktop and server, KVM-class in
+role.
+
+### Containerization, natively
+
+Docker/podman-style workflows are a design target, not a compatibility layer.
+Dovenix's architecture is unusually well-shaped for this: the kernel has **no
+global namespaces** (all naming is userspace) and **no ambient authority** (all
+access is via granted handles), so a "container" is simply a process tree started
+with a different namespace map and a bounded resource budget — the isolation
+primitive the whole OS is built on, not a bolted-on kernel feature like Linux
+namespaces. OCI image and runtime compatibility is the goal so existing
+container tooling and registries work.
+
+### Proper hardware integration
+
+Daily-driver means the machine behaves like a laptop/desktop should: ACPI
+(via ACPICA's permissive license branch), sleep/resume (s2idle and S3), battery
+status and charge control, thermal management, CPU/device frequency scaling, lid
+and power-button policy. Device power transitions ride the same driver-lifecycle
+machinery as live update (quiesce/restore), so suspend support is not optional
+per-driver heroics — it falls out of protocol conformance.
+
 ## Non-goals
 
 - **Formal verification of the kernel.** We take seL4's design lessons, not its proof

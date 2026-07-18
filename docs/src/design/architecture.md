@@ -23,12 +23,13 @@ The Dovenix kernel is a capability-based, "microkernel-ish" kernel in Rust:
 | Object | Purpose |
 |---|---|
 | Process / Thread | Isolation and execution |
+| Job | Process-tree container: resource limits, accounting, kill-by-subtree |
 | VMO (virtual memory object) | Sharable memory; backing for mappings and rings |
 | Channel | Bidirectional message + handle transfer (control plane) |
 | Event / Signal | Cheap async notification (data-plane doorbells) |
 | Interrupt | Userspace interrupt delivery to drivers |
 | IoRegion | MMIO/port access grant, IOMMU-constrained |
-| VmDomain | A hardware virtual machine (hosts the Linux driver VM) |
+| VmDomain | A hardware virtual machine — public hypervisor API; also hosts the Linux driver VM |
 
 ## System topology
 
@@ -80,6 +81,53 @@ A/B system images are specified in a future boot & update document.
 - **Crash-restart is the same machinery** with an empty state blob and replayed
   configuration — stability (goal 2) and upgradability (goal 4) share one design.
 
+## Virtualization: hypervisor as a public API
+
+The kernel is a type-1 hypervisor by construction — VT-x/EPT and ARM EL2 support
+exist from day one because the Linux driver VM and untrusted driver domains require
+them. `VmDomain` is therefore a **public kernel object**, not internal plumbing:
+
+- A userspace VMM server (`vmmd`) builds guest VMs from `VmDomain` + VMO-backed
+  guest memory + virtio device backends, exactly the way the driver VM is built.
+- Guest-facing devices are ordinary Dovenix components: a virtio-blk backend is a
+  DWP *client* of a block driver on one side and a virtio device on the other.
+- KVM-class role: running Linux (and other) guests is a supported product feature
+  for desktop and server, and doubles as the app-compatibility escape hatch.
+
+## Containers: namespaces were never in the kernel to begin with
+
+Dovenix gets Docker/podman-class containerization without a dedicated kernel
+subsystem, because the two things Linux had to retrofit are the native primitives
+here:
+
+- **Namespacing**: the kernel has no global names — a process sees exactly the
+  namespace map (filesystem view, services, network identity) its parent handed it
+  at spawn. A container is just a process tree given a different map. There is no
+  "escape the namespace" attack class, because there is no global namespace to
+  escape into.
+- **Resource control**: the `Job` hierarchy carries CPU/memory/handle budgets and
+  accounting (cgroup role, but a first-class kernel object).
+- **`containerd`-role server**: assembles OCI images into namespace maps, manages
+  container lifecycles, and speaks OCI so existing registries and tooling work.
+- **Spectrum of isolation**: the same OCI image can run as a process-tree container
+  (cheap) or inside a `VmDomain` (Kata-style hard isolation) — the choice is a
+  launch flag, since both substrates are native.
+
+## Hardware integration: power as a lifecycle, not a bolt-on
+
+- **ACPI** via ACPICA (permissive Intel license branch), wrapped in a userspace
+  `powerd` server: power states, battery, thermal zones, lid/buttons, frequency
+  scaling policy.
+- **Sleep/resume** (s2idle first, S3 where firmware cooperates): system suspend is
+  a coordinated quiesce — `powerd` asks devmgr to drive drivers through the same
+  DWP quiesce/restore states used for live update. A driver that passes update
+  conformance is suspend-capable by construction; there is no separate,
+  perpetually-broken suspend path per driver.
+- **Battery/charge management** and thermal policy are `powerd` clients of driver
+  classes (`battery`, `thermal` — to be specced alongside `block`).
+- The Linux driver VM participates: it receives suspend notifications like any
+  other component, using Linux's own PM for the devices it fronts.
+
 ## POSIX strategy
 
 POSIX is a personality, not the core: servers speak Dovenix-native protocols;
@@ -93,3 +141,9 @@ compatibility metric rather than an architectural constraint.
 - Scheduler design for the Linux-benchmark goal (needs its own doc).
 - Filesystem choice for M3/M4 (port vs. new; candidates: FAT for boot, then a
   permissively-licensed modern FS or a new one).
+- Namespace map format and spawn-time handoff ABI (the container substrate — needs
+  its own doc before posixd lands).
+- Suspend vs. live-update quiesce: same FSM states or a parallel power FSM in DWP?
+  (Tracked as DWP open question; current lean: same states, different resume verb.)
+- How much of the OCI runtime spec to implement natively vs. adapt via a ported
+  runtime shim.

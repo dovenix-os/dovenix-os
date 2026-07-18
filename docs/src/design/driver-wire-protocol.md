@@ -184,6 +184,8 @@ schemas + queue layouts + retry semantics, layered on the core. Initial classes:
 | `console` | byte stream + resize | virtio-console, serial |
 | `bus` | enumerate children, grant resources (devmgr delegate) | PCIe |
 | `display` | modeset + framebuffer present (deliberately minimal) | virtio-gpu |
+| `battery` | charge state, health, charge-control (powerd client) | ACPI battery |
+| `thermal` | zones, trip points, cooling devices (powerd client) | ACPI thermal |
 
 Each class gets its own spec page as it is implemented; `block` will be written
 first and serves as the template, including the per-operation

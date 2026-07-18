@@ -35,6 +35,14 @@ security as the first design input rather than a retrofit. The design center:
 6. **Modularity** — components are developed, tested, and shipped independently, and the
    OS is adaptable to specific use cases (server, desktop, mobile).
 
+Alongside these, three **first-class platform capabilities** are designed in from the
+start (see [Goals](docs/src/vision/goals.md)): native hardware virtualization (the
+kernel is a type-1 hypervisor by construction, exposed as a public API), native
+containerization (namespace maps + resource-budgeted jobs, OCI-compatible — the
+docker/podman experience without retrofitted kernel namespaces), and proper hardware
+integration (ACPI, sleep/resume, battery, thermal — riding the same driver-lifecycle
+machinery as live update).
+
 ## Hardware strategy
 
 Real-hardware daily-driving as fast as possible, via a three-tier driver strategy:
