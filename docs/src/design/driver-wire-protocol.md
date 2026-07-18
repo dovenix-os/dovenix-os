@@ -178,7 +178,7 @@ schemas + queue layouts + retry semantics, layered on the core. Initial classes:
 
 | Class | v0 scope | First implementation |
 |---|---|---|
-| `block` | read/write/flush/discard, barriers, geometry | virtio-blk, then NVMe |
+| [`block`](classes/block.md) | read/write/flush/discard/write-zeroes, FUA + flush ordering (no barriers), geometry | virtio-blk, then NVMe |
 | `net` | tx/rx queues, MAC/link status, offload negotiation | virtio-net |
 | `input` | event stream (evdev-inspired semantics) | virtio-input |
 | `console` | byte stream + resize | virtio-console, serial |
@@ -187,9 +187,11 @@ schemas + queue layouts + retry semantics, layered on the core. Initial classes:
 | `battery` | charge state, health, charge-control (powerd client) | ACPI battery |
 | `thermal` | zones, trip points, cooling devices (powerd client) | ACPI thermal |
 
-Each class gets its own spec page as it is implemented; `block` will be written
-first and serves as the template, including the per-operation
-`ERR_PEER_RESET` retry table (§6.3).
+Each class gets its own spec page as it is implemented. The
+[`block` class spec](classes/block.md) is written and serves as the template —
+including the per-operation `ERR_PEER_RESET` retry table (§6.3) and the
+restart durability rule that makes crash-restart and live update safe for
+storage clients.
 
 ## 10. IDL and code generation
 

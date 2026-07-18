@@ -11,6 +11,7 @@
 
 - [Architecture Overview](design/architecture.md)
 - [Driver Wire Protocol](design/driver-wire-protocol.md)
+  - [Class: block](design/classes/block.md)
 - [Licensing Model](design/licensing.md)
 
 # Development
