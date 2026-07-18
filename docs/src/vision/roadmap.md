@@ -18,7 +18,11 @@
 
 ## M2 — VirtIO userland
 
+- SMP bring-up (multicore-first discipline applies from M1; this is where it
+  gets exercised).
 - Device manager (supervisor) + driver hosts speaking wire protocol v0.
+- First `libs/` sync/async primitives land **with schedule points** (the L1
+  deterministic test scheduler arrives with them, not after).
 - Native VirtIO drivers: block, net, console, input.
 - First crash-restart demonstration: kill virtio-blk mid-I/O, driver restarts,
   in-flight operations complete or fail cleanly per protocol semantics.
@@ -59,3 +63,9 @@
 
 - ARM64 port. Wayland compositor. First ported GPL drivers where the VM hop hurts.
   Mobile exploration.
+- Whole-system deterministic simulation harness (L3) and per-component flight
+  recorder (L4) — see [Determinism](../design/determinism.md).
+- RT stack: scheduler RT/deadline classes, IPC priority inheritance, core
+  shielding; `audio` DWP class; the pro-audio zero-XRun acceptance benchmark.
+- NUMA/manycore scaling pass (supercomputer posture): per-core kernel state
+  audit, topology-aware placement.

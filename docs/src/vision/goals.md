@@ -57,6 +57,32 @@ Components are developed, tested, versioned, and shipped independently. The same
 component set reconfigures into server, desktop, or mobile products. The monorepo is
 structured so any component can be split out without surgery.
 
+## Cross-cutting design principles
+
+Not goals or features — rules that resolve design questions everywhere:
+
+### Multicore-first
+
+There will be no new single-core processors; a single core is just a multicore
+system with one core. Therefore: no code that assumes uniprocessor, per-CPU
+data structures from the first line of kernel code, no globally serialized
+subsystem, and a scaling story that reaches supercomputers — the
+message-passing component architecture already leans multikernel
+(Barrelfish-style: treat a manycore machine as a distributed system), so
+kernel-internal state stays per-CPU and NUMA-aware rather than lock-guarded
+and global. Retrofitting this is measured in decades (Linux's BKL removal);
+we start there instead.
+
+### Determinism by default, speed by declaration
+
+Concurrent software must be exactly reproducible — crashes replayable from
+recorded history, interleavings scriptable in tests — with all instrumentation
+**zero-cost when off**. Components escape for speed or real time (busy-poll,
+direct timers, RT scheduling, core shielding) only through **declared,
+auditable capability grants** that localize the loss of replayability to the
+escaping component. See [Determinism](../design/determinism.md). Nothing may
+introduce a nondeterministic input that is not kernel-mediated and recordable.
+
 ## First-class platform capabilities
 
 These are not priorities that trade off against each other like the list above —
@@ -96,6 +122,23 @@ the [POSIX strategy](../design/architecture.md#posix-strategy-first-class-ports-
 Porting success is measured by a named package set building unpatched (release
 gate from M3). Linux *binary* compatibility remains a non-goal for now — source
 compatibility is the commitment.
+
+### Deterministic development and debugging
+
+The multicore-first principle made developer-facing: a deterministic test
+scheduler in the standard sync/async primitives (seeded and *scripted*
+interleavings), component record/replay via capability interposition,
+whole-system deterministic simulation for e2e, and a per-component production
+flight recorder. Specified in [Determinism](../design/determinism.md).
+
+### Real-time capability
+
+Priority/deadline scheduling with **priority inheritance across IPC** (the
+classic microkernel inversion problem, solved in the kernel object model, not
+patched later), core shielding, and locked-memory RT paths. The acceptance
+benchmark is pro-audio: sub-millisecond-period full-duplex audio with zero
+XRuns under load, as a stock capability
+([worked example](../design/determinism.md#511-worked-example-and-acceptance-benchmark-pro-audio-latency)).
 
 ### Proper hardware integration
 

@@ -17,6 +17,17 @@ The Dovenix kernel is a capability-based, "microkernel-ish" kernel in Rust:
 - **Hardware does the enforcement.** IOMMU for DMA isolation, virtualization
   extensions for untrusted driver domains, MPK/PKS for sub-process compartments,
   CET/PAC/BTI/MTE as baseline hardening.
+- **Multicore-first.** Per-CPU kernel state from the first commit, no global
+  locks guarding subsystems, NUMA-aware allocation/scheduling, and a
+  multikernel-leaning scaling posture (per-core state + messages, matching the
+  component architecture) that targets everything from one core to
+  supercomputers. Scheduling includes RT classes with priority inheritance
+  propagated along IPC chains — a kernel object-model requirement, designed in
+  now (see [Determinism §5.1](determinism.md)).
+- **Deterministic by default, fast by declaration.** All nondeterminism enters
+  through enumerable, recordable kernel interfaces; components take declared
+  capability escapes (busy-poll, direct timers, RT, core shielding) for speed.
+  Full design: [Determinism, Record/Replay, and Escape Hatches](determinism.md).
 
 ## Kernel objects (initial set)
 
@@ -175,7 +186,9 @@ trivial patches. This metric is a release gate, same as the performance benchmar
   including the exact shape of the POSIX-driven primitives: COW address-space
   snapshot for `fork`, thread interruption for signals.
 - MPK/PKS compartment policy: which same-address-space boundaries are worth it?
-- Scheduler design for the Linux-benchmark goal (needs its own doc).
+- Scheduler design for the Linux-benchmark goal (needs its own doc): fair
+  class + RT/deadline classes (seL4-MCS-informed budgets), IPC priority
+  inheritance mechanics, core shielding, NUMA topology awareness.
 - Filesystem choice for M3/M4 (port vs. new; candidates: FAT for boot, then a
   permissively-licensed modern FS or a new one).
 - Namespace map format and spawn-time handoff ABI (the container substrate — needs

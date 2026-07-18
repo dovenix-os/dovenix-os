@@ -48,8 +48,14 @@ performance benchmark suite (goal 3).
   generates them; drivers fuzzed through their service channels.
 - **Fault injection as a first-class harness feature**: process kills, deadline
   overruns, malformed messages, hostile ring states.
-- **Determinism**: harnesses control time and randomness sources where possible so
-  failures replay.
+- **Determinism**: harnesses control time and randomness sources so failures
+  replay from a seed. This is not best-effort — it is the harness's end state:
+  whole-system deterministic simulation (virtual time, multiplexed simulated
+  cores, seeded fault injection), with scripted-interleaving tests at the
+  component level via the schedule points built into `libs/` primitives. The
+  full layer stack is specified in [Determinism](../design/determinism.md).
+  RT/escape-hatch paths are the exception: they are verified by measurement
+  (latency/deadline benchmarks under load), not by replay.
 
 ## Why this works here (and doesn't on a monolith)
 

@@ -102,6 +102,12 @@ the full transcript.
 
 ## Open items
 
+- Design constraints on Phase 3/4 from the determinism & multicore docs
+  (added 2026-07-17): scheduler and channel design must not preclude IPC
+  priority inheritance (thread/channel objects carry an effective-priority
+  slot from the start); kernel state per-CPU-shaped even while single-CPU;
+  all time exposed to userspace flows through kernel-mediated interfaces.
+
 - Syscall ABI doc (`docs/src/design/syscalls.md`) should be drafted during
   Phase 4 while the handle model is hot — it's a book doc, so design review
   happens there, not here.

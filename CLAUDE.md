@@ -29,6 +29,12 @@ userspace drivers/servers, POSIX-first compatibility. Pre-alpha; specs lead code
 - **Wire protocols are contracts**: any DWP or class change requires the
   version bump + doc update in the same change
   (`docs/src/design/driver-wire-protocol.md` §7).
+- **Multicore-first**: no code that assumes uniprocessor; kernel state is
+  per-CPU, never guarded by new global locks.
+- **Determinism invariants** (`docs/src/design/determinism.md` §4): never add
+  a nondeterministic input that isn't kernel-mediated and recordable; system
+  components use only `libs/` sync/async primitives (they carry the schedule
+  points); escape hatches are declared capability grants, never smuggled.
 
 ## Building
 
