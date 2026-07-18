@@ -2,6 +2,7 @@
 status: draft            # draft | active | done | superseded
 updated: YYYY-MM-DD
 depends-on: []           # other plans, e.g. [m1-boot]
+approved-by: pending     # filled in ONLY by the approving human: "name, YYYY-MM-DD"
 ---
 
 # <Milestone or feature name>
@@ -16,6 +17,11 @@ For milestones, quote the roadmap entry.>
 - <Deliberate deferrals, with where they went>
 
 ## Order of work
+
+<Every phase ends at a human checkpoint: run the phase-completion protocol in
+CLAUDE.md (audit for security/reliability/Rust idioms → update docs and
+docstrings and confirm them → pause for human review). Do not start the next
+phase unreviewed.>
 
 ### Phase 1 — <name>
 

@@ -2,6 +2,7 @@
 status: active
 updated: 2026-07-17
 depends-on: []
+approved-by: pending     # awaiting human approval per plans/README rule 3
 ---
 
 # M1 — Boots in QEMU

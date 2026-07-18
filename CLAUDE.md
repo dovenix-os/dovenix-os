@@ -36,6 +36,39 @@ userspace drivers/servers, POSIX-first compatibility. Pre-alpha; specs lead code
   components use only `libs/` sync/async primitives (they carry the schedule
   points); escape hatches are declared capability grants, never smuggled.
 
+## Development workflow (mandatory — this OS is developed mostly by AI agents)
+
+The loop below is not optional and has no fast path. Human checkpoints are the
+product's safety mechanism; skipping one is never a favor.
+
+1. **Plan first, approved by a human.** No feature or milestone implementation
+   starts without a phased plan in `plans/` whose frontmatter carries
+   `approved-by` filled in by a human. `status: active` without approval is
+   invalid. Propose the plan, then stop and wait.
+2. **Design goes in the book.** The book (`docs/`) is the canonical
+   description/definition of the system. Any design decision or hard spec that
+   emerges during planning or implementation lands as a book change (same PR),
+   subject to the same human approval. Plans sequence design; they never
+   contain it.
+3. **Phases end in something a human can verify.** Each phase's outcome must be
+   directly checkable — an e2e scenario that runs green, an observable demo, a
+   reviewable spec. "Internal progress" that a human can't exercise is not a
+   phase boundary.
+4. **Phase completion protocol**, in order, before asking for review:
+   a. **Audit** the phase's work for **security** (unsafe blocks justified and
+      minimal, all external input validated, capability scope not widened),
+      **reliability** (no silent failures, errors propagated or handled
+      deliberately, resources cleaned up on all paths), and **Rust-native
+      idioms** (clippy-clean, no C-brain patterns, ownership expresses the
+      design). Fix what you find or report what you can't.
+   b. **Update all relevant documentation** — book docs, plan status/deviations,
+      READMEs, and **docstrings** on public items — to match what was actually
+      built, and **confirm the documentation updates with the user**.
+   c. **Pause for human review.** Do not start the next phase on your own.
+5. **Committing**: no implementation commit until step 4b's documentation is
+   updated and confirmed. (Docs-only and plan-only commits don't need the
+   audit, but design changes still need approval per rule 2.)
+
 ## Building
 
 Nothing builds yet (design phase). `cargo xtask` will be the entry point for

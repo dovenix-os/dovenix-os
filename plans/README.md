@@ -15,14 +15,21 @@ agent — is doing the work (how, in what order, what's done, what's blocked).
    nontrivial cross-cutting feature** (`feature-<name>.md`). Small features
    don't need plans.
 3. **Every plan carries frontmatter**: `status` (draft | active | done |
-   superseded), `updated` (date), `depends-on`. Exactly **one** milestone plan
-   is `active` at a time.
-4. **Keep plans current.** When a work session changes reality (task done,
+   superseded), `updated` (date), `depends-on`, and `approved-by` — the human
+   who approved the plan (name + date), filled in **only by that human**.
+   Exactly **one** milestone plan is `active` at a time, and a plan may not be
+   `active` (nor may implementation start) while `approved-by` is `pending`.
+4. **Phases are human-verifiable and human-gated.** Every phase ends in
+   something a human can directly verify, and completing a phase means running
+   the phase-completion protocol in `CLAUDE.md` (audit → docs updated and
+   confirmed → pause for review). Agents do not roll from one phase into the
+   next unreviewed.
+5. **Keep plans current.** When a work session changes reality (task done,
    approach changed, blocker found), update the plan in the same commit as the
    code. A stale plan is worse than no plan. Done plans stay (marked `done`) as
    the record of how it actually went; log significant deviations in the
    plan's Deviations section rather than rewriting history.
-5. **Task granularity**: a task is one reviewable change (roughly one PR) with
+6. **Task granularity**: a task is one reviewable change (roughly one PR) with
    its e2e-verifiable outcome stated. Not "write the scheduler" — "boot two
    threads that ping-pong over a channel, asserted by the M1 harness".
 
