@@ -124,6 +124,58 @@ measurable even with registration — extreme small-packet networking at
 100G-class rates (IOTLB pressure) — is an M4+ tuning problem (page sizes,
 IOVA layout), not an architectural one.
 
+## Intra-address-space compartments: MPK/PKS and the isolation ladder
+
+**The mechanism.** Changing page permissions normally means `mprotect`-class
+work: a syscall, page-table edits, TLB shootdowns — microseconds, worse on
+many cores. Memory Protection Keys add indirection: each PTE carries a 4-bit
+key (16 per address space, assigned once); the *effective* permissions per key
+live in a **per-thread register** — PKRU in user mode (Intel MPK/PKU, modern
+AMD too), the `IA32_PKRS` MSR in kernel mode (PKS); ARM64's equivalent is POE
+(permission overlays). Writing that register is unprivileged and costs
+~10–20 cycles: no syscall, no TLB effect, per-thread. Tag a sensitive region
+with a key, default every thread to "no access", and open a nanosecond
+*window* (write register → touch → write register) only in the code paths
+meant to touch it.
+
+**The honest limit.** Because the register write is unprivileged, code with
+arbitrary execution inside the process can simply re-open the key. MPK alone
+is therefore **not** a security boundary against a compromised compartment —
+it becomes one only with control-flow integrity plus `WRPKRU`-gadget
+scrubbing (ERIM/Hodor lineage; CET/BTI help), which is opt-in machinery, not
+the default assumption. What it *is*, at near-zero goal-3 cost, is a
+**bug-containment and exploit-hardening boundary**: stray writes, stale
+pointers, slips in `unsafe` blocks fault instantly instead of silently
+corrupting state. That is a goal-2 tool with goal-1 defense-in-depth value —
+which is exactly the register in which the kernel-philosophy bullet cites it.
+
+**The isolation ladder.** Dovenix has four cost-ordered isolation rungs; the
+design rule is *pick the cheapest rung that meets the threat*:
+
+| Rung | Cost | Boundary against |
+|---|---|---|
+| 1. Same compartment | free | nothing |
+| 2. MPK/PKS compartment | ~ns window flips | bugs and stray writes; exploits only with gadget control |
+| 3. Process | context switch + IPC | compromised code (MMU + capabilities) |
+| 4. VmDomain | VM exit costs | compromised kernel-adjacent code (EPT/EL2 + IOMMU) |
+
+Drivers and servers sit on rung 3, untrusted driver domains and guests on
+rung 4. Rung 2 exists for boundaries *inside* one component, where a process
+split would cost IPC on a hot path.
+
+**Intended uses.** Userspace (MPK): a server keeps its crown jewels —
+`vfsd`'s cache metadata, key material in a crypto service, the flight-recorder
+ring (determinism L4) — writable only inside tiny windows, so 99% of its own
+code can't corrupt them; a driver host can make its ring-handling module the
+only writer of ring memory. Kernel (PKS): page tables, IOMMU tables, and
+handle tables stay write-disabled outside the narrow paths meant to mutate
+them, so a stray write in the kernel's `unsafe` core becomes an immediate
+fault, not an escalation primitive. Keys are scarce (16): a budgeted resource
+for a few high-value regions, not sprinkled everywhere — the compartment
+policy (which regions, key budget, whether rung 2 is ever promoted to a true
+security boundary via gadget scrubbing) gets its own design doc when the
+first servers exist (M2/M3; see open questions).
+
 ## Boot path
 
 ```
@@ -237,7 +289,10 @@ trivial patches. This metric is a release gate, same as the performance benchmar
 - Exact kernel syscall surface and handle rights model (needs its own doc) —
   including the exact shape of the POSIX-driven primitives: COW address-space
   snapshot for `fork`, thread interruption for signals.
-- MPK/PKS compartment policy: which same-address-space boundaries are worth it?
+- MPK/PKS compartment policy: which regions get the 16-key budget, and is
+  rung 2 ever promoted to a real security boundary (gadget scrubbing + CFI)?
+  Own design doc due with the first servers (M2/M3) — see the
+  [compartments section](#intra-address-space-compartments-mpkpks-and-the-isolation-ladder).
 - Scheduler design for the Linux-benchmark goal (needs its own doc): fair
   class + RT/deadline classes (seL4-MCS-informed budgets), IPC priority
   inheritance mechanics, core shielding, NUMA topology awareness.

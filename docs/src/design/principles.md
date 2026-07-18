@@ -31,6 +31,10 @@ bug to fix).
 - **IOMMU is mandatory for anything that touches DMA, with no bypass; its cost
   is defeated by the registration model (map at queue creation, never
   per-operation).** → [Architecture: DMA isolation](architecture.md#dma-isolation-and-the-registration-model)
+- **Isolation is a cost-ordered ladder — pick the cheapest rung that meets the
+  threat**: same-compartment → MPK/PKS window (bug containment, not a boundary
+  against arbitrary code execution unless gadget-controlled) → process →
+  VmDomain. → [Architecture: compartments](architecture.md#intra-address-space-compartments-mpkpks-and-the-isolation-ladder)
 - **Everything crossing a trust or fault boundary is adversarial** — wire
   input, ring contents, indices: validate at consumption, degrade to errors,
   never crash or hang. → [DWP §8.5, §11](driver-wire-protocol.md)
