@@ -1,7 +1,7 @@
 # Driver Class: `console`
 
 > **Status: draft v0.1.** Fourth DWP class. It is the first **reliable ordered
-> stream**: unlike `net`, loss is *not* contractual — bytes are delivered in
+> stream**: unlike [`net`](net.md), loss is *not* contractual — bytes are delivered in
 > order, and the only permitted loss (hardware overrun, restart gap) must be
 > detected and announced. This class carries the system's earliest and most
 > important I/O: the boot console, and terminals for M1–M3 development and e2e
@@ -15,7 +15,7 @@ written for Dovenix), virtio-console (M2), later USB serial.
 - **Driver**: one stream per session (a multi-port device exposes one session
   per port via devmgr).
 - **Client**: the console/log service, e2e test harnesses, `posixd` (as the
-  backend for a real terminal; ptys themselves live in `posixd`, not here —
+  backend for a real terminal; ptys themselves live in [`posixd`](../architecture.md#posix-strategy-first-class-ports-without-unnecessary-change), not here —
   this class is transport to hardware, line discipline is client policy).
 - Out of scope v0: modem-control-driven protocols (PPP-era), RS-485 modes.
 
@@ -62,7 +62,8 @@ struct ConParams {
 }
 ```
 
-Absolute state, idempotent, blindly replayable (the pattern set by `net` §3.3).
+Absolute state, idempotent, blindly replayable (the pattern set by
+[`net` §3.3](net.md#33-configuration)).
 
 ### 3.4 `CON_SEND_BREAK { duration_ms: u16 }` (requires `BREAK`)
 
@@ -75,8 +76,9 @@ Absolute state, idempotent, blindly replayable (the pattern set by `net` §3.3).
 
 ## 4. Data plane
 
-Two generic queues (DWP core §8), shaped exactly like `net`'s TX/RX — a
-`direction` field in `CON_QUEUE_CREATE` mirrors `NET_QUEUE_CREATE` — but
+Two generic queues ([DWP core §8](../driver-wire-protocol.md#8-data-plane-generic-queues)),
+shaped exactly like `net`'s TX/RX — a `direction` field in `CON_QUEUE_CREATE`
+mirrors [`NET_QUEUE_CREATE`](net.md#34-queues) — but
 entries describe **byte chunks, not frames**: chunk boundaries carry no
 meaning, and the driver may split or coalesce freely in either direction.
 
@@ -135,11 +137,12 @@ need better (file transfer over serial) already checksum above the stream.
 
 ## 7. Quiesce, state, restore
 
-- **`QUIESCE`**: drain the TX FIFO to the wire (bounded by baud rate — the
+- **[`QUIESCE`](../driver-wire-protocol.md#62-quiesce--serialize--restore-live-update)**:
+  drain the TX FIFO to the wire (bounded by baud rate — the
   deadline must account for it), stop RX into the device FIFO, report.
 - **State blob**: negotiated version + features + current `ConParams`.
   Terminal size is *not* serialized — re-queried/re-announced at restore
-  (the `net` link-state precedent).
+  (the [`net` link-state precedent](net.md#7-quiesce-state-restore-per-dwp-62)).
 - **Restore**: reprogram params, resume; RX bytes that arrived during the gap
   are lost and flagged `OVERRUN` per §5.2.
 
@@ -156,7 +159,7 @@ need better (file transfer over serial) already checksum above the stream.
    suffices.
 5. **Quiesce under load**: TX drain completes within baud-derived deadline;
    live update presents as a clean announced gap.
-6. **Adversarial rings** per core §8.5.
+6. **Adversarial rings** per [core §8.5](../driver-wire-protocol.md#85-trust-and-validation).
 
 ## 9. Open questions (v0.1 → v0.2)
 

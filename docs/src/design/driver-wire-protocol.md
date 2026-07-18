@@ -7,9 +7,9 @@
 
 Every driver in Dovenix — native, ported-GPL, or backed by the Linux driver VM — is
 an isolated process whose **only** connection to the rest of the system is this
-protocol. That single boundary serves four goals at once:
+protocol. That single boundary serves [four goals](../vision/goals.md) at once:
 
-1. **License boundary** (licensing model): a GPL-2.0-only ported driver is a separate
+1. **License boundary** ([licensing model](licensing.md)): a GPL-2.0-only ported driver is a separate
    program communicating over a versioned wire protocol. The GPL stops here.
 2. **Fault isolation** (goal 2): a crashed driver is restarted by its supervisor and
    re-driven through the same protocol; clients observe a defined error, not a hang.
@@ -38,7 +38,8 @@ channels concurrently but has exactly one supervisor channel.
 
 ## 3. Transport assumptions
 
-DWP is defined over the kernel's primitives:
+DWP is defined over the
+[kernel's primitives](architecture.md#kernel-objects-initial-set):
 
 - **Channel**: datagram-oriented, bidirectional, preserves message boundaries,
   transfers capability handles along with bytes. Control plane.
@@ -105,7 +106,8 @@ The supervisor channel drives every driver host through this FSM:
 
 1. `HELLO` (§7): version negotiation, driver identity, capabilities advertisement.
 2. `BIND`: devmgr passes device resources as handles — IoRegions, Interrupts,
-   IOMMU-constrained DMA authority, config data. The driver never enumerates or
+   [IOMMU-constrained DMA authority](architecture.md#dma-isolation-and-the-registration-model),
+   config data. The driver never enumerates or
    claims hardware itself; **all device authority arrives explicitly on this
    channel.** (Security goal: a driver's maximum reach is what BIND granted.)
 3. `START`: driver begins serving service channels.

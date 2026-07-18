@@ -35,6 +35,10 @@ bug to fix).
   threat**: same-compartment → MPK/PKS window (bug containment, not a boundary
   against arbitrary code execution unless gadget-controlled) → process →
   VmDomain. → [Architecture: compartments](architecture.md#intra-address-space-compartments-mpkpks-and-the-isolation-ladder)
+- **CPU-level mitigations are baseline, not opt-in**: every binary is built
+  with them, the kernel enforces whatever the silicon offers, and they harden
+  isolation rungs but never substitute for one.
+  → [Architecture: CPU-level mitigations](architecture.md#cpu-level-mitigations-the-baseline-hardening-set)
 - **Everything crossing a trust or fault boundary is adversarial** — wire
   input, ring contents, indices: validate at consumption, degrade to errors,
   never crash or hang. → [DWP §8.5, §11](driver-wire-protocol.md)

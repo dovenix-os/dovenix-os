@@ -14,9 +14,11 @@ The Dovenix kernel is a capability-based, "microkernel-ish" kernel in Rust:
 - **Everything is a handle.** Processes hold unforgeable capability handles to kernel
   objects (address spaces, threads, memory objects, channels, interrupts, device
   resources). No global namespaces in the kernel; namespaces are a userspace concern.
-- **Hardware does the enforcement.** IOMMU for DMA isolation, virtualization
-  extensions for untrusted driver domains, MPK/PKS for sub-process compartments,
-  CET/PAC/BTI/MTE as baseline hardening.
+- **Hardware does the enforcement.**
+  [IOMMU for DMA isolation](#dma-isolation-and-the-registration-model),
+  [virtualization extensions for untrusted driver domains](#virtualization-hypervisor-as-a-public-api),
+  [MPK/PKS for sub-process compartments](#intra-address-space-compartments-mpkpks-and-the-isolation-ladder),
+  [CET/PAC/BTI/MTE as baseline hardening](#cpu-level-mitigations-the-baseline-hardening-set).
 - **Multicore-first.** Per-CPU kernel state from the first commit, no global
   locks guarding subsystems, NUMA-aware allocation/scheduling, and a
   multikernel-leaning scaling posture (per-core state + messages, matching the
@@ -40,7 +42,7 @@ The Dovenix kernel is a capability-based, "microkernel-ish" kernel in Rust:
 | Event / Signal | Cheap async notification (data-plane doorbells) |
 | Interrupt | Userspace interrupt delivery to drivers |
 | IoRegion | MMIO/port access grant, IOMMU-constrained |
-| VmDomain | A hardware virtual machine — public hypervisor API; also hosts the Linux driver VM |
+| VmDomain | A hardware virtual machine — [public hypervisor API](#virtualization-hypervisor-as-a-public-api); also hosts the Linux driver VM |
 
 ## System topology
 
@@ -64,11 +66,14 @@ The Dovenix kernel is a capability-based, "microkernel-ish" kernel in Rust:
   driver host process per driver, grants it exactly the IoRegions/Interrupts/IOMMU
   mappings its device needs, and supervises its lifecycle (crash-restart, live
   update) via the [driver wire protocol](driver-wire-protocol.md).
-- **Driver hosts** are isolated processes. Native drivers and ported GPL drivers are
+- **Driver hosts** are isolated processes. Native drivers and
+  [ported GPL drivers](licensing.md#why-gpl-islands-are-legally-sound) are
   architecturally identical — the license difference is invisible at runtime, which
   is the point.
-- **The Linux driver VM** is an unmodified Linux running in a VmDomain with selected
-  physical devices passed through (VFIO-style, IOMMU-isolated). It re-exports those
+- **The Linux driver VM** is an
+  [unmodified Linux](licensing.md#the-linux-driver-vm-aggregation-not-derivation)
+  running in a VmDomain with selected physical devices passed through (VFIO-style,
+  IOMMU-isolated). It re-exports those
   devices to Dovenix as virtio devices, which Dovenix consumes with its own native
   virtio drivers. This makes real desktop hardware usable from day one.
 
@@ -80,9 +85,10 @@ driver process isolation is fiction — a compromised driver simply programs its
 device to DMA over kernel memory, and no CPU-side mechanism ever sees it
 (malicious peripherals — Thunderbolt/PCILeech-class attacks — do the same
 without any driver compromise). The IOMMU (VT-d/AMD-Vi/SMMU) is an MMU for
-devices: per-device page tables on every DMA. With it, a `BIND` grant is
-hardware-enforced on **both** sides of a driver — the MMU bounds the process,
-the IOMMU bounds its device to exactly the granted data VMOs. Three pillars of
+devices: per-device page tables on every DMA. With it, a
+[`BIND` grant](driver-wire-protocol.md#61-bring-up) is hardware-enforced on
+**both** sides of a driver — the MMU bounds the process, the IOMMU bounds its
+device to exactly the granted data VMOs. Three pillars of
 this book stand on that: driver crash/compromise containment, the GPL-island
 trust story, and the safety of Linux-driver-VM device passthrough. Hence the
 non-goal: no support for DMA-capable hardware without an IOMMU.
@@ -99,7 +105,8 @@ two distinct components:
    modes that trade a security window for throughput.
 
 Dovenix avoids cost 2 **structurally**: data VMOs are IOMMU-mapped **once, at
-queue creation** (DWP core §8.1), descriptors reference offsets within those
+queue creation** ([DWP §8.1](driver-wire-protocol.md#81-queue-anatomy)),
+descriptors reference offsets within those
 long-lived mappings, and no hot path ever touches IOMMU state — teardown and
 rebind happen at session end or under quiesce, off the fast path. This is the
 registration model RDMA, DPDK, and io_uring's registered buffers converged on;
@@ -108,7 +115,8 @@ does [determinism](determinism.md) §4.1 — the constraints rhyme), so the fast
 mapping model falls out of the architecture rather than fighting it.
 
 **No bypass exists.** Nondeterminism escape hatches (`mem.shared-fast`,
-`sched.poll`) relax *observability*, never DMA containment; there is no
+`sched.poll` — [Determinism §5](determinism.md#5-escape-hatches-speed-and-real-time))
+relax *observability*, never DMA containment; there is no
 `iommu=off`. Security is goal 1, speed is goal 3 — the answer to IOMMU cost is
 the registration model, not a hole in the foundation.
 
@@ -142,7 +150,9 @@ meant to touch it.
 arbitrary execution inside the process can simply re-open the key. MPK alone
 is therefore **not** a security boundary against a compromised compartment —
 it becomes one only with control-flow integrity plus `WRPKRU`-gadget
-scrubbing (ERIM/Hodor lineage; CET/BTI help), which is opt-in machinery, not
+scrubbing (ERIM/Hodor lineage;
+[CET/BTI help](#cpu-level-mitigations-the-baseline-hardening-set)), which is
+opt-in machinery, not
 the default assumption. What it *is*, at near-zero goal-3 cost, is a
 **bug-containment and exploit-hardening boundary**: stray writes, stale
 pointers, slips in `unsafe` blocks fault instantly instead of silently
@@ -165,7 +175,7 @@ split would cost IPC on a hot path.
 
 **Intended uses.** Userspace (MPK): a server keeps its crown jewels —
 `vfsd`'s cache metadata, key material in a crypto service, the flight-recorder
-ring (determinism L4) — writable only inside tiny windows, so 99% of its own
+ring ([determinism L4](determinism.md#l4--production-flight-recorder-the-debug-mode)) — writable only inside tiny windows, so 99% of its own
 code can't corrupt them; a driver host can make its ring-handling module the
 only writer of ring memory. Kernel (PKS): page tables, IOMMU tables, and
 handle tables stay write-disabled outside the narrow paths meant to mutate
@@ -175,6 +185,96 @@ for a few high-value regions, not sprinkled everywhere — the compartment
 policy (which regions, key budget, whether rung 2 is ever promoted to a true
 security boundary via gadget scrubbing) gets its own design doc when the
 first servers exist (M2/M3; see open questions).
+
+## CPU-level mitigations: the baseline hardening set
+
+**What they are.** Modern cores ship a set of exploit-chain breakers: each one
+turns a step of the classic exploitation playbook into a hardware fault, at
+near-zero runtime cost. [Goal 1](../vision/goals.md#1-security) makes them
+baseline. The set, by the attack step it breaks:
+
+| Attack step broken | x86 | ARM64 |
+|---|---|---|
+| Kernel executes code in user pages | SMEP | PXN |
+| Kernel dereferences an unvalidated user pointer | SMAP | PAN |
+| Overwrite a return address (stack smash → ROP) | CET shadow stacks | PAC |
+| Indirect branch into a gadget (JOP; `WRPKRU` abuse) | CET IBT | BTI |
+| Use-after-free / heap out-of-bounds | — | MTE |
+
+**Privilege boundary (SMEP/SMAP, PXN/PAN).** SMEP and PXN make user pages
+never-executable in kernel mode, killing the historic kernel exploit: corrupt
+one kernel function pointer, aim it at shellcode the attacker staged in their
+own process. SMAP and PAN close the data-access version: kernel-mode reads and
+writes of user pages fault unless the kernel explicitly opens a window
+(`stac`/`clac` on x86, the PAN bit on ARM64) around the access. The design
+consequence sits in the kernel: user memory is reached **only** through
+dedicated copy-in/copy-out primitives that validate then copy inside that
+window — never dereferenced in place — so an unvalidated user pointer touched
+anywhere else in the kernel faults instantly instead of becoming an arbitrary
+read/write primitive.
+
+**Backward-edge control flow (CET shadow stacks, PAC).** A CET shadow stack
+is a second, hardware-maintained stack that holds only return addresses and
+rejects ordinary stores; `ret` pops both stacks and faults on mismatch, so a
+smashed return address aborts instead of starting a ROP chain. ARM64 reaches
+the same end by cryptography instead of duplication: PAC (pointer
+authentication) signs a pointer into its unused upper bits with a per-context
+key on the way in and authenticates it before use, so a corrupted or forged
+return address fails authentication and faults. PAC generalizes beyond return
+addresses — function and data pointers can carry signatures too.
+
+**Forward-edge control flow (IBT, BTI).** Every legitimate indirect-branch
+target starts with a landing-pad instruction (`endbr64` / `bti`); an indirect
+call or jump landing anywhere else faults. This kills jump-oriented
+programming — and it is the enabling half of
+[promoting an MPK compartment to a security boundary](#intra-address-space-compartments-mpkpks-and-the-isolation-ladder):
+scrubbing `WRPKRU` gadgets only means something when an attacker cannot land
+mid-instruction-stream to synthesize new ones.
+
+**Memory tagging (MTE).** Physical memory carries a 4-bit tag per 16-byte
+granule; pointers carry a matching tag in their top byte; the allocator
+re-colors memory on allocate and free. A load or store whose pointer tag
+mismatches the memory's tag faults — synchronously (precise, costlier) or
+asynchronously (near-free, batched) — catching use-after-free and
+out-of-bounds at hardware speed. Detection is probabilistic (15/16 per
+access), which is ample for catching bugs and breaking exploit reliability.
+
+**Where each is applied.**
+
+- *Enabled by the kernel at boot*, per feature, wherever the silicon has it:
+  for its own mode (SMEP/SMAP, supervisor shadow stacks, kernel PAC keys and
+  BTI — the kernel hardens itself first) and for userspace (per-thread user
+  shadow stacks, per-process PAC keys, MTE heap tagging).
+- *Emitted by the toolchain everywhere.* Landing pads and PAC signing are
+  code generation, so the entire tree — kernel, `libs/`, servers, drivers —
+  builds with branch protection on. The instructions encode as NOPs on
+  hardware without the features, so one binary runs everywhere and the
+  protections light up where the silicon supports them.
+- *Designed into the ABI from day one.* Thread creation allocates the shadow
+  stack; signal delivery, unwinding, and `longjmp` are specified against it;
+  binaries record which protections they were built with. This is where
+  "design inputs, not retrofits" is priced: Linux took over a decade from CET
+  silicon to shipped user shadow stacks because its ABI (`longjmp`, green
+  threads, JITs) predates the mechanism — an ABI born with it pays nothing.
+- *The payoff concentrates in code Rust can't check.* Safe Rust already
+  statically prevents most of what these catch, so the value lands on the
+  kernel's `unsafe` core, `unsafe` blocks in drivers and `libs/`, and above
+  all ported C/C++ — the
+  [POSIX ports](#posix-strategy-first-class-ports-without-unnecessary-change)
+  and [GPL driver islands](licensing.md#why-gpl-islands-are-legally-sound)
+  that are the system's least-trusted code get the full set with zero source
+  changes, because everything here is codegen plus kernel enforcement. MTE
+  runs synchronous in the e2e/debug harness, asynchronous in production.
+
+**The honest limit.** These are hardening, not boundaries: they break exploit
+*techniques*, and detection is probabilistic where tags and signatures are
+small (MTE's 4 bits; PAC signatures shrink as virtual-address bits grow).
+Hardware coverage is also uneven — CET needs ~2020-or-later x86 cores, PAC/BTI
+need ARMv8.3+/8.5+, MTE is rarer still. So the baseline posture is: every
+binary carries the protections, the kernel enforces whatever the silicon
+offers, and a missing feature degrades defense-in-depth only — actual security
+boundaries are always the MMU/IOMMU/EPT rungs of the
+[isolation ladder](#intra-address-space-compartments-mpkpks-and-the-isolation-ladder).
 
 ## Boot path
 
@@ -189,7 +289,8 @@ A/B system images are specified in a future boot & update document.
 
 - **Components** (drivers, servers): quiesce → serialize state → start new version →
   restore → resume, with the old binary and state blob retained for rollback. This is
-  a wire-protocol feature, not per-component heroics.
+  a [wire-protocol feature](driver-wire-protocol.md#62-quiesce--serialize--restore-live-update),
+  not per-component heroics.
 - **Kernel**: serialized state handoff across a near-instant kernel swap
   (kexec-style). The kernel is the only component whose update implies a (sub-second)
   execution gap.

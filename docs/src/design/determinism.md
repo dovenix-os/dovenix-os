@@ -34,7 +34,7 @@ affordable when almost everywhere else it is not:
 2. **A component is a deterministic function of its message history.** All
    nondeterminism enters through enumerable kernel interfaces: channel
    messages, event wakeups, ring index transitions, time queries, RNG. No
-   ambient authority means no hidden input channels. (DWP golden transcripts
+   ambient authority means no hidden input channels. ([DWP golden transcripts](driver-wire-protocol.md#12-testing-hooks)
    are the primitive form of this; this doc is that idea taken to its end.)
 
 ## 3. The four layers
@@ -75,8 +75,8 @@ FoundationDB/TigerBeetle-lineage: the entire OS runs against virtual time
 with simulated cores multiplexed onto host threads — wall-clock parallelism
 is sacrificed, concurrency *semantics* are kept, one seed reproduces an
 entire system execution including injected faults (crashes, delays, torn
-messages). This is the stated end-state of the e2e harness (testing
-strategy): the multicore-first principle read backwards — a multicore system
+messages). This is the stated end-state of the e2e harness
+([testing strategy](../dev/testing.md)): the multicore-first principle read backwards — a multicore system
 simulated on one core is still the same system.
 
 ### L4 — Production flight recorder (the debug mode)
@@ -90,8 +90,11 @@ observation.
 ## 4. Day-one invariants (cannot be retrofitted)
 
 1. **Nondeterminism stays enumerable.** No vDSO-style time reads that bypass
-   kernel mediation in the default ABI; unmediated `RDTSC`/counter access is
-   an escape hatch (§5), trapped otherwise in recorded modes (`CR4.TSD`);
+   kernel mediation in the default ABI; unmediated cycle-counter reads
+   (x86's `RDTSC` instruction and its equivalents — a raw timestamp readable
+   from userspace with no syscall) are an escape hatch (§5), trapped otherwise
+   in recorded modes (via `CR4.TSD`, the x86 control bit that makes `RDTSC`
+   privileged);
    shared memory with outside writers exists only as declared objects (rings,
    named shared VMOs); ASLR and other intentional randomness are seedable and
    suspendable in debug modes. Nothing may add a nondeterministic input
@@ -101,8 +104,9 @@ observation.
    compile to nothing in release configuration. No third-party sync
    primitives in system components.
 3. **Logical time is first-class in protocols.** Messages and events carry
-   logical timestamps with explicit clock domains (input's
-   interrupt-time stamps are the template), so recorded histories are
+   logical timestamps with explicit clock domains
+   ([input's interrupt-time stamps](classes/input.md#4-data-plane-the-inline-credit-model)
+   are the template), so recorded histories are
    self-ordering across components.
 
 ## 5. Escape hatches: speed and real time
@@ -115,7 +119,7 @@ any other capability (manifest-declared, devmgr-granted, auditable):
 |---|---|---|
 | `time.direct` | Unmediated cycle counters / direct time reads | Time values unrecordable; component replay becomes input-boundary-approximate |
 | `mem.shared-fast` | Shared memory with another component outside ring discipline | Cross-component sync order unrecorded on that surface |
-| `sched.poll` | Busy-poll rings, no doorbell waits (DPDK/io_uring-class data paths — the ring design already supports poll mode) | Wakeup ordering unrecorded on that queue |
+| `sched.poll` | Busy-poll rings, no doorbell waits (DPDK/io_uring-class data paths — the [ring design already supports poll mode](driver-wire-protocol.md#84-doorbells)) | Wakeup ordering unrecorded on that queue |
 | `sched.rt` | Real-time scheduling (§5.1) | RT paths verified by measurement, not replay |
 
 Consequences are local: a component that takes escape hatches forfeits exact
@@ -154,8 +158,9 @@ The path exercises every RT mechanism above at once:
 - the device period interrupt propagates as a priority-inheriting wakeup chain
   (driver → audio server → client) — multi-hop inversion is exactly the §5.1
   IPC-priority problem;
-- buffers move through DWP-style rings shared along the chain (zero copies on
-  the period path), with `sched.poll` as the sub-period option for extreme
+- buffers move through
+  [DWP-style rings](driver-wire-protocol.md#8-data-plane-generic-queues) shared
+  along the chain (zero copies on the period path), with `sched.poll` as the sub-period option for extreme
   cases;
 - a shielded core is the escalation for hard sessions (recording studio mode).
 

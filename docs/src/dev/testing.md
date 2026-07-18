@@ -1,7 +1,8 @@
 # Testing Strategy
 
-> **Status: draft.** The stance is settled (goal 5); the harness design will firm up
-> at milestone M1.
+> **Status: draft.** The stance is settled
+> ([goal 5](../vision/goals.md#5-testability--e2e-and-integration-only)); the
+> harness design will firm up at milestone M1.
 
 ## The stance: e2e and integration only, no unit tests
 
@@ -17,10 +18,12 @@ from real behavior, and add refactoring drag without adding boot confidence.
 Boot a minimal system in QEMU containing: kernel, devmgr, the component under test,
 and a **harness component** on the other end of its protocol. The harness asserts:
 
-- lifecycle FSM correctness (HELLO/BIND/START, quiesce under load, restore fidelity)
+- [lifecycle FSM](../design/driver-wire-protocol.md#6-lifecycle-state-machine)
+  correctness (HELLO/BIND/START, quiesce under load, restore fidelity)
 - version negotiation, including rejection paths
 - crash-restart semantics: kill the component mid-operation, assert every in-flight
-  transaction resolves per its declared retry class
+  transaction resolves per its declared
+  [retry class](../design/driver-wire-protocol.md#63-crash-restart)
 - for drivers: the class conformance suite (see the
   [wire protocol](../design/driver-wire-protocol.md), §12)
 

@@ -40,6 +40,11 @@ userspace drivers/servers, POSIX-first compatibility. Pre-alpha; specs lead code
   a nondeterministic input that isn't kernel-mediated and recordable; system
   components use only `libs/` sync/async primitives (they carry the schedule
   points); escape hatches are declared capability grants, never smuggled.
+- **Docs are written for humans, not just agents with grep**: when a doc
+  mentions a concept specified or justified elsewhere, link it at first
+  mention — complex concepts link to their **formal rationale** (the section
+  arguing *why*), not just a related page. The link alone suffices; don't
+  restate the definition inline.
 
 ## Development workflow (mandatory — this OS is developed mostly by AI agents)
 

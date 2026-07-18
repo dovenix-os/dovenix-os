@@ -4,7 +4,8 @@ Dovenix is a **monorepo, structured for later fission**: every top-level directo
 is an independently buildable, independently licensable unit that could be split
 into its own repository without surgery. The enforcement mechanism is simple —
 components may only depend on `libs/`, never on each other's internals; all
-cross-component contact happens over protocols.
+cross-component contact happens over
+[protocols](../design/driver-wire-protocol.md).
 
 ```text
 dovenix-os/
@@ -34,14 +35,15 @@ dovenix-os/
 
 1. **Dependency direction**: `kernel` depends on nothing in-tree; `servers/`,
    `drivers/`, `tools/`, `tests/` depend only on `libs/`. No exceptions.
-2. **License scoping**: `drivers/ported/` is the only place GPL code may exist.
+2. **[License scoping](../design/licensing.md)**: `drivers/ported/` is the only place GPL code may exist.
    `libs/` must remain linkable from GPL islands (`Apache-2.0 OR MIT`, no
    GPL-incompatible transitive deps).
 3. **One Cargo workspace** at the root for now; each directory keeps its own crate
    graph coherent so it can become a standalone workspace when split out.
-4. **Tests live with the system, not the component**: per goal 5, components are
-   tested end-to-end from `tests/` via their protocols, not with in-crate unit
-   tests.
+4. **Tests live with the system, not the component**: per
+   [goal 5](../vision/goals.md#5-testability--e2e-and-integration-only), components
+   are [tested end-to-end](testing.md) from `tests/` via their protocols, not with
+   in-crate unit tests.
 5. **Book vs. plans**: this book is normative design (what and why); `plans/`
    holds implementation plans (how and in what order) as working documents for
    contributors and agents — see `plans/README.md`. When they disagree, the

@@ -55,7 +55,8 @@ idempotent → blindly replayable.
 
 ## 4. Data plane: the inline credit model
 
-One generic queue (DWP core §8), **no data VMOs**. A submission is a bare
+One generic queue ([DWP core §8](../driver-wire-protocol.md#8-data-plane-generic-queues)),
+**no data VMOs**. A submission is a bare
 credit; the driver spends one credit per event, delivering the event **inline
 in the completion entry**:
 
@@ -81,8 +82,9 @@ struct InputEvent {       // C = 32
 
 - The type/code/value vocabulary follows evdev's model (KEY/REL/ABS/SW plus
   SYN framing; multitouch via ABS_MT slots). The exact code table is defined in
-  `dwp-schema` — evdev-*inspired*, not ABI-identical (we are not bound by Linux
-  header values, and clean-room rules apply).
+  [`dwp-schema`](../driver-wire-protocol.md#10-idl-and-code-generation) —
+  evdev-*inspired*, not ABI-identical (we are not bound by Linux header values,
+  and [clean-room rules](../licensing.md#operational-rules) apply).
 - Events between two `SYN_REPORT`s form one device report and share a
   timestamp; clients coalesce at SYN boundaries, exactly like evdev consumers.
 
@@ -119,7 +121,8 @@ restart is, to the client, just a large announced overflow.
 - **`QUIESCE`**: stop event delivery, discard the device's internal event FIFO
   (input events are transient by nature — §5.2 covers the loss). Immediate.
 - **State blob**: negotiated version + LED state. This class is the
-  degenerate-blob case and serves as the minimal example of DWP §6.4.
+  degenerate-blob case and serves as the minimal example of
+  [DWP §6.4](../driver-wire-protocol.md#64-state-blobs).
 - **Restore**: reprogram LEDs, resume. Clients observe it as an `OVERRUN`.
 
 ## 8. Conformance suite
@@ -132,7 +135,8 @@ restart is, to the client, just a large announced overflow.
    `OVERRUN` announced, `GET_STATE` resync yields truth.
 4. **Restart**: kill mid-storm with keys held; assert the client resync path
    ends with correct key state — the stuck-modifier test, automated.
-5. **Adversarial**: hostile credit ring per core §8.5.
+5. **Adversarial**: hostile credit ring per
+   [core §8.5](../driver-wire-protocol.md#85-trust-and-validation).
 
 ## 9. Open questions (v0.1 → v0.2)
 

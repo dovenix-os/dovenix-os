@@ -23,12 +23,13 @@ multi-queue (one queue pair per session in v0 — see §9).
 | | |
 |---|---|
 | Class name | `block` |
-| Class version | `0.1` (negotiated in `HELLO` per DWP §7) |
+| Class version | `0.1` (negotiated in `HELLO` per [DWP §7](../driver-wire-protocol.md#7-versioning-and-negotiation)) |
 | `msg_type` namespace | `0x0001_xxxx` |
 
 ## 3. Control plane (channel messages)
 
-All messages ride the DWP header (core §4); payloads below are the flat structs.
+All messages ride the DWP header ([core §4](../driver-wire-protocol.md#4-wire-format));
+payloads below are the flat structs.
 Sizes in blocks are in **logical blocks** unless stated.
 
 ### 3.1 `BLK_GET_INFO` (client → driver)
@@ -91,7 +92,8 @@ responds. `BLK_QUEUE_DESTROY(queue_id)` tears it down after draining.
 ## 4. Data plane
 
 Queue machinery — ring VMO layout, index discipline, doorbells, adversarial
-validation — is the generic queue spec (DWP core §8). `block` defines a
+validation — is the generic queue spec ([DWP core §8](../driver-wire-protocol.md#8-data-plane-generic-queues)).
+`block` defines a
 **64-byte submission descriptor** and **16-byte completion entry**:
 
 ```rust
@@ -123,7 +125,7 @@ completions, adversarial validation, index ground truth — are DWP core §8):
 
 - **Single contiguous data segment per request** in v0 (no SGL). Clients coalesce
   or split; vectored I/O revisited with real measurements (§9).
-- Driver-side validation per core §8.5 covers: opcode known, LBA range within
+- Driver-side validation per [core §8.5](../driver-wire-protocol.md#85-trust-and-validation) covers: opcode known, LBA range within
   capacity, `block_count` ≤ `max_transfer_blocks`, `data_offset` logical-block
   aligned and within the named data VMO.
 - **There is no implicit inter-request ordering** — no barriers. Ordering is
@@ -148,8 +150,8 @@ This section is normative; filesystems are built on it.
 
 ## 6. Crash-restart and retry semantics (per DWP §6.3)
 
-On `ERR_PEER_RESET`, every in-flight request is failed and the session enters a
-new restart epoch. Per-operation retry classes:
+On [`ERR_PEER_RESET`](../driver-wire-protocol.md#63-crash-restart), every
+in-flight request is failed and the session enters a new restart epoch. Per-operation retry classes:
 
 | Opcode | Retry class | Rationale |
 |---|---|---|
@@ -175,7 +177,8 @@ volatile state surviving.
 - **`QUIESCE`**: stop consuming new ring descriptors; complete all in-flight
   requests; if `WRITE_CACHE`, issue a device-level cache flush; then report
   `QUIESCED`. Result: rings drained, media durable, device idle.
-- **State blob** (versioned, per DWP §6.4) contains logical session state only:
+- **State blob** (versioned, per [DWP §6.4](../driver-wire-protocol.md#64-state-blobs))
+  contains logical session state only:
   negotiated class version and features, queue configs (`queue_id`, depth,
   data-VMO count), restart-epoch counter. Ring indices live in the shared ring
   VMO and survive by construction; channel and VMO handles are re-granted by

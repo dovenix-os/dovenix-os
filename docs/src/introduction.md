@@ -6,8 +6,9 @@ The one-sentence pitch: **microkernel-grade isolation, enforced by modern hardwa
 security features instead of paid for with IPC everywhere, benchmarked against Linux
 on speed.**
 
-Dovenix follows the design philosophy pioneered by Fuchsia's Zircon — a pragmatic,
-capability-based "microkernel-ish" kernel — but is implemented fresh in Rust under
+Dovenix follows the design philosophy pioneered by Fuchsia's Zircon — a
+[pragmatic, capability-based "microkernel-ish" kernel](design/architecture.md#kernel-philosophy-zircon-inspired-hardware-enforced)
+— but is implemented fresh in Rust under
 permissive licenses (`Apache-2.0 OR MIT`), drawing on seL4's security literature,
 and on Redox and Managarm as existence proofs that a small team can ship a
 Rust-based POSIX-capable OS.
@@ -15,7 +16,9 @@ Rust-based POSIX-capable OS.
 One deliberate departure from Fuchsia: **POSIX is first-class, not an emulation
 detail.** Existing Linux/BSD/macOS software must port without unnecessary change,
 and where Zircon's model conflicts with that (`fork`, signals, POSIX filesystem
-semantics), POSIX wins at the boundary — the capability model stays underneath.
+semantics),
+[POSIX wins at the boundary](design/architecture.md#posix-strategy-first-class-ports-without-unnecessary-change)
+— the capability model stays underneath.
 
 ## Where the project is today
 

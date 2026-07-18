@@ -9,16 +9,25 @@ Trade-offs between goals are resolved by this ordering, not case-by-case debate.
 Modern processor hardware security features are design inputs, not retrofits:
 
 - **Boot**: UEFI Secure Boot, measured boot (TPM), a verified chain from firmware to
-  every system component.
-- **Memory isolation**: separate address spaces for all drivers/servers; IOMMU/SMMU
-  mandatory for anything that touches DMA; MPK/PKS for cheap intra-address-space
-  compartments where a full process is too expensive.
+  every system component. See the
+  [boot path](../design/architecture.md#boot-path).
+- **Memory isolation**: separate address spaces for all drivers/servers;
+  [IOMMU/SMMU mandatory](../design/architecture.md#dma-isolation-and-the-registration-model)
+  for anything that touches DMA;
+  [MPK/PKS for cheap intra-address-space compartments](../design/architecture.md#intra-address-space-compartments-mpkpks-and-the-isolation-ladder)
+  where a full process is too expensive (that section also defines the
+  isolation ladder — which rung to pick for which threat).
 - **CPU-level mitigations as baseline**: SMEP/SMAP, CET shadow stacks and IBT on x86;
-  PAC, BTI, and MTE on ARM64.
+  PAN/PXN, PAC, BTI, and MTE on ARM64. What each one is and where it is
+  applied:
+  [CPU-level mitigations](../design/architecture.md#cpu-level-mitigations-the-baseline-hardening-set).
 - **Virtualization as an isolation tool**: VT-x/EPT and EL2 host untrusted driver
-  domains (including the Linux driver VM).
+  domains (including the Linux driver VM). See
+  [hypervisor as a public API](../design/architecture.md#virtualization-hypervisor-as-a-public-api).
 - **Capability-based authority**: no ambient authority; every resource is reached
-  through an explicitly granted, unforgeable handle.
+  through an explicitly granted, unforgeable handle. See
+  [kernel philosophy](../design/architecture.md#kernel-philosophy-zircon-inspired-hardware-enforced)
+  and the [load-bearing principles index](../design/principles.md#security-and-isolation).
 - **Memory-safe implementation**: Rust throughout; `unsafe` confined and audited.
 
 ### 2. Stability
@@ -32,30 +41,38 @@ machinery as live update (goal 4), so it is designed once, in the
 
 **The benchmark is Linux**, on real workloads, on the same hardware. Consequences:
 
-- The kernel boundary is drawn pragmatically (Zircon-style), not ascetically
-  (MINIX-style). Hot paths may live in the kernel when isolation can be preserved by
-  hardware means.
-- Bulk data moves through shared-memory rings, not messages.
-- The IPC primitive budget is set by measuring, not by ideology.
+- The [kernel boundary is drawn pragmatically](../design/architecture.md#kernel-philosophy-zircon-inspired-hardware-enforced)
+  (Zircon-style), not ascetically (MINIX-style). Hot paths may live in the kernel
+  when isolation can be preserved by hardware means.
+- Bulk data moves through
+  [shared-memory rings](../design/driver-wire-protocol.md#8-data-plane-generic-queues),
+  not messages.
+- The IPC primitive budget — which mechanisms the kernel offers, and how many —
+  is [set by measuring, not by ideology](../design/architecture.md#kernel-philosophy-zircon-inspired-hardware-enforced):
+  a primitive earns its place by winning benchmarks, not by fitting a doctrine
+  of kernel minimality.
 
 ### 4. Live upgradability
 
-Everything above the kernel upgrades live, with rollback. The kernel itself upgrades
+Everything above the kernel
+[upgrades live, with rollback](../design/architecture.md#live-update-model).
+The kernel itself upgrades
 via near-instant reboot with serialized state handoff (kexec-style): quiesce
 components, serialize state, swap kernel, restore. Rollback keeps the old binary and
 old state blob until the new version is confirmed healthy.
 
 ### 5. Testability — e2e and integration only
 
-No unit tests. Every component is a process with a typed protocol, so the natural
-test is: boot a partial system in QEMU with a test-harness component on the other end
-of the protocol. Golden transcripts, protocol fuzzing, and full-system scenario tests.
+[No unit tests](../dev/testing.md). Every component is a process with a typed
+protocol, so the natural test is: boot a partial system in QEMU with a test-harness
+component on the other end of the protocol. Golden transcripts, protocol fuzzing, and full-system scenario tests.
 
 ### 6. Modularity
 
 Components are developed, tested, versioned, and shipped independently. The same
-component set reconfigures into server, desktop, or mobile products. The monorepo is
-structured so any component can be split out without surgery.
+component set reconfigures into server, desktop, or mobile products. The
+[monorepo is structured](../dev/repo-layout.md) so any component can be split out
+without surgery.
 
 ## Cross-cutting design principles
 
@@ -93,16 +110,17 @@ one is cheap if native and miserable if retrofitted:
 
 The kernel already runs a hypervisor (VT-x/EPT, ARM EL2) for the Linux driver VM
 and for isolating untrusted driver domains. That machinery is exposed as a
-**public, first-class API** (the `VmDomain` kernel object), not kept as internal
-plumbing — making Dovenix a type-1 hypervisor by construction. Running guest VMs
+[**public, first-class API**](../design/architecture.md#virtualization-hypervisor-as-a-public-api)
+(the `VmDomain` kernel object), not kept as internal plumbing — making Dovenix a type-1 hypervisor by construction. Running guest VMs
 (Linux, others) is a supported product feature on desktop and server, KVM-class in
 role.
 
 ### Containerization, natively
 
 Docker/podman-style workflows are a design target, not a compatibility layer.
-Dovenix's architecture is unusually well-shaped for this: the kernel has **no
-global namespaces** (all naming is userspace) and **no ambient authority** (all
+Dovenix's architecture is
+[unusually well-shaped for this](../design/architecture.md#containers-namespaces-were-never-in-the-kernel-to-begin-with):
+the kernel has **no global namespaces** (all naming is userspace) and **no ambient authority** (all
 access is via granted handles), so a "container" is simply a process tree started
 with a different namespace map and a bounded resource budget — the isolation
 primitive the whole OS is built on, not a bolted-on kernel feature like Linux
@@ -145,8 +163,9 @@ XRuns under load, as a stock capability
 Daily-driver means the machine behaves like a laptop/desktop should: ACPI
 (via ACPICA's permissive license branch), sleep/resume (s2idle and S3), battery
 status and charge control, thermal management, CPU/device frequency scaling, lid
-and power-button policy. Device power transitions ride the same driver-lifecycle
-machinery as live update (quiesce/restore), so suspend support is not optional
+and power-button policy. Device power transitions
+[ride the same driver-lifecycle machinery as live update](../design/architecture.md#hardware-integration-power-as-a-lifecycle-not-a-bolt-on)
+(quiesce/restore), so suspend support is not optional
 per-driver heroics — it falls out of protocol conformance.
 
 ## Non-goals

@@ -29,7 +29,8 @@ and serves as reference, while seL4's GPLv2 kernel is off-limits for derivation)
 Linux is **GPL-2.0-only**, and the FSF considers Apache-2.0 **incompatible with
 GPLv2** (its patent-termination and indemnification terms are "additional
 restrictions" under GPLv2). A driver ported from Linux is a GPL-2.0-only derivative
-work — and it must link our driver SDK, IPC stubs, and DWP codec crates to function.
+work — and it must link our driver SDK, IPC stubs, and
+[DWP codec crates](driver-wire-protocol.md#10-idl-and-code-generation) to function.
 
 If those crates were Apache-2.0-only, the combined driver binary would have no valid
 license. Dual-licensing them lets the GPL island link them **under MIT** (which is
@@ -61,7 +62,8 @@ kernel; Linux itself hosts proprietary userspace across the syscall boundary.
 
 ### The Linux driver VM: aggregation, not derivation
 
-The driver VM runs an **unmodified** Linux in an isolated VM domain, re-exporting
+The [driver VM](architecture.md#system-topology) runs an **unmodified** Linux in
+an isolated VM domain, re-exporting
 passed-through devices as virtio. Dovenix consumes them with its own permissive
 virtio drivers. Linux here is a separate aggregated program; nothing in Dovenix
 derives from it. The VM image is built and shipped as a distinct artifact with its

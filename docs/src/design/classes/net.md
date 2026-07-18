@@ -11,7 +11,8 @@ Ethernet-semantics packet devices: virtio-net (M2), then real NICs (M4 — e1000
 class hardware, whether native, ported, or VM-backed, all behind this same class).
 
 - **Driver**: exposes one network interface per service channel session.
-- **Client**: `netd` (the network stack — smoltcp-lineage per roadmap M3); also
+- **Client**: `netd` (the network stack — smoltcp-lineage per
+  [roadmap M3](../../vision/roadmap.md#m3--posix-layer)); also
   test harnesses and, later, virtualization backends bridging guest traffic.
 - Out of scope for v0: multi-queue/RSS (layout ready, §9), LRO, PTP timestamping,
   Wake-on-LAN (needs a powerd story), MACsec/offloaded crypto.
@@ -21,7 +22,7 @@ class hardware, whether native, ported, or VM-backed, all behind this same class
 | | |
 |---|---|
 | Class name | `net` |
-| Class version | `0.1` (negotiated in `HELLO` per DWP §7) |
+| Class version | `0.1` (negotiated in `HELLO` per [DWP §7](../driver-wire-protocol.md#7-versioning-and-negotiation)) |
 | `msg_type` namespace | `0x0002_xxxx` |
 
 ## 3. Control plane
@@ -71,7 +72,8 @@ struct NetLinkState {
 
 ### 3.4 Queues
 
-`NET_QUEUE_CREATE` mirrors `block` (§3.3 there) with one addition:
+`NET_QUEUE_CREATE` mirrors `block` ([§3.3 there](block.md#33-blk_queue_create-client--driver))
+with one addition:
 
 ```rust
 struct NetQueueCreate {
@@ -84,7 +86,8 @@ struct NetQueueCreate {
 ```
 
 A functioning interface needs one TX and one RX queue. Both are generic queues
-(DWP core §8) — only the *meaning* of the rings differs:
+([DWP core §8](../driver-wire-protocol.md#8-data-plane-generic-queues)) — only the
+*meaning* of the rings differs:
 
 - **TX**: submission = filled frames to transmit; completion = frame sent (buffer
   reusable).
@@ -168,7 +171,7 @@ are about *integrity*, not delivery:
 
 ## 6. Crash-restart and retry semantics (per DWP §6.3)
 
-On `ERR_PEER_RESET`:
+On [`ERR_PEER_RESET`](../driver-wire-protocol.md#63-crash-restart):
 
 | Operation | Retry class | Rationale |
 |---|---|---|
@@ -185,7 +188,8 @@ indistinguishable from a brief cable pull — which the stack must tolerate anyw
 
 ## 7. Quiesce, state, restore (per DWP §6.2)
 
-- **`QUIESCE`**: stop RX (arriving frames drop — permitted by §5.1), complete or
+- **[`QUIESCE`](../driver-wire-protocol.md#62-quiesce--serialize--restore-live-update)**:
+  stop RX (arriving frames drop — permitted by §5.1), complete or
   discard in-flight TX (discarded TX completes with `NET_ERR_CANCELED`; the
   frame counts as dropped), report `QUIESCED`. Unlike `block` there is nothing
   to flush — quiesce is fast and bounded by a single TX drain.
@@ -214,7 +218,7 @@ indistinguishable from a brief cable pull — which the stack must tolerate anyw
    dropped, never duplicated/corrupted), stack (netd) recovers TCP sessions.
 6. **Live update under traffic**: measures the gap, enforces the bound, asserts
    config survives via blob and link state re-announces.
-7. **Adversarial rings**: as `block` §8.4.
+7. **Adversarial rings**: as [`block` §8.4](block.md#8-conformance-suite-per-dwp-12-definition-of-done).
 
 ## 9. Open questions (v0.1 → v0.2)
 
