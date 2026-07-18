@@ -12,9 +12,10 @@ dovenix-os/
 ├── README.md, CONTRIBUTING.md
 ├── Cargo.toml                      # workspace root (members added as crates land)
 ├── rust-toolchain.toml             # pinned toolchain
-├── docs/                           # this book (mdBook)
+├── docs/                           # this book (mdBook) — normative design docs
 │   ├── book.toml
 │   └── src/
+├── plans/                          # implementation plans (working docs, not in the book)
 ├── kernel/                         # the Dovenix kernel (no_std Rust)
 ├── libs/                           # everything linkable — MUST stay Apache-2.0 OR MIT
 │   ├── dwp-schema/                 # (future) wire-protocol IDL: source of truth
@@ -41,3 +42,7 @@ dovenix-os/
 4. **Tests live with the system, not the component**: per goal 5, components are
    tested end-to-end from `tests/` via their protocols, not with in-crate unit
    tests.
+5. **Book vs. plans**: this book is normative design (what and why); `plans/`
+   holds implementation plans (how and in what order) as working documents for
+   contributors and agents — see `plans/README.md`. When they disagree, the
+   book wins.
