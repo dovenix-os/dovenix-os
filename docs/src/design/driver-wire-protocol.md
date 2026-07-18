@@ -222,7 +222,13 @@ polling mode and interrupt mitigation configuration-free client policies.
 Each side treats ring and descriptor contents as **adversarial** — rings cross
 a fault boundary and (for GPL islands and VM-backed drivers) a trust boundary.
 The consumer re-validates every field at consumption time (opcodes, ranges,
-alignment, data-VMO bounds). A malformed descriptor produces an error
+alignment, data-VMO bounds). Validation only means something on a
+**snapshot**: the ring stays writable by the peer, so a field that was valid
+when checked can be rewritten before use (shared-memory TOCTOU). The consumer
+MUST read each descriptor field exactly once — copied into private memory —
+and validate and act on that copy, never re-reading the shared slot; codecs
+use volatile/once reads so the compiler cannot reintroduce a second load.
+A malformed descriptor produces an error
 completion; a corrupt index (out of window, regressing) costs the offender the
 session. Neither side may be crashable, blockable, or hangable by the other's
 ring behavior.

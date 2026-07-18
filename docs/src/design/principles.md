@@ -61,8 +61,9 @@ bug to fix).
   isolation rungs but never substitute for one.
   → [Architecture: CPU-level mitigations](architecture.md#cpu-level-mitigations-the-baseline-hardening-set)
 - **Everything crossing a trust or fault boundary is adversarial** — wire
-  input, ring contents, indices: validate at consumption, degrade to errors,
-  never crash or hang. → [DWP §8.5, §11](driver-wire-protocol.md)
+  input, ring contents, indices: validate at consumption on a read-once
+  snapshot (peer-writable memory is never re-read after checking), degrade to
+  errors, never crash or hang. → [DWP §8.5, §11](driver-wire-protocol.md)
 - **GPL code exists only as isolated processes in `drivers/ported/`; every
   linkable library stays GPLv2-compatible (`Apache-2.0 OR MIT`).**
   → [Licensing](licensing.md)
