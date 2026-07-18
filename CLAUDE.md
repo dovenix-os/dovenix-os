@@ -55,12 +55,15 @@ product's safety mechanism; skipping one is never a favor.
    reviewable spec. "Internal progress" that a human can't exercise is not a
    phase boundary.
 4. **Phase completion protocol**, in order, before asking for review:
-   a. **Audit** the phase's work for **security** (unsafe blocks justified and
-      minimal, all external input validated, capability scope not widened),
-      **reliability** (no silent failures, errors propagated or handled
-      deliberately, resources cleaned up on all paths), and **Rust-native
-      idioms** (clippy-clean, no C-brain patterns, ownership expresses the
-      design). Fix what you find or report what you can't.
+   a. **Audit** the phase's work, in this order: first **reliability** (no
+      silent failures, errors propagated or handled deliberately, resources
+      cleaned up on all paths) and **Rust-native idioms** (clippy-clean, no
+      C-brain patterns, ownership expresses the design), applying fixes; then
+      **security last** (unsafe blocks justified and minimal, all external
+      input validated, capability scope not widened), so it reviews the code
+      as it will actually ship — a security pass is invalidated by any fix
+      applied after it. If a security finding forces changes, re-run security
+      on the result. Fix what you find or report what you can't.
    b. **Update all relevant documentation** — book docs, plan status/deviations,
       READMEs, and **docstrings** on public items — to match what was actually
       built, and **confirm the documentation updates with the user**.

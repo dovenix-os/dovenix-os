@@ -21,9 +21,9 @@ agent — is doing the work (how, in what order, what's done, what's blocked).
    `active` (nor may implementation start) while `approved-by` is `pending`.
 4. **Phases are human-verifiable and human-gated.** Every phase ends in
    something a human can directly verify, and completing a phase means running
-   the phase-completion protocol in `CLAUDE.md` (audit → docs updated and
-   confirmed → pause for review). Agents do not roll from one phase into the
-   next unreviewed.
+   the phase-completion protocol in `CLAUDE.md` (audit: reliability and Rust
+   idioms first, security last → docs updated and confirmed → pause for
+   review). Agents do not roll from one phase into the next unreviewed.
 5. **Keep plans current.** When a work session changes reality (task done,
    approach changed, blocker found), update the plan in the same commit as the
    code. A stale plan is worse than no plan. Done plans stay (marked `done`) as
