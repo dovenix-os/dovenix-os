@@ -28,6 +28,12 @@ bug to fix).
   granted.** Handles are the only authority; for drivers, all device authority
   arrives at `BIND`. → [Architecture](architecture.md),
   [DWP §6.1](driver-wire-protocol.md)
+- **Authority is what a process can reach, not what it holds: system servers
+  are never ambient-authority oracles.** Whatever an endpoint hands out is
+  derived from the requesting connection's namespace map, so a spawned
+  subtree's reachable authority stays a subset of its spawner's at every
+  delegation depth (this is what makes nested agents safe).
+  → [Architecture: agents](architecture.md#agents-the-container-substrate-plus-a-grant-model)
 - **IOMMU is mandatory for anything that touches DMA, with no bypass; its cost
   is defeated by the registration model (map at queue creation, never
   per-operation).** → [Architecture: DMA isolation](architecture.md#dma-isolation-and-the-registration-model)

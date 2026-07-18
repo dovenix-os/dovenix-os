@@ -329,6 +329,61 @@ here:
   (cheap) or inside a `VmDomain` (Kata-style hard isolation) — the choice is a
   launch flag, since both substrates are native.
 
+## Agents: the container substrate plus a grant model
+
+AI agents acting on the user's behalf are a first-class workload
+([goals](../vision/goals.md#agent-operation-natively)): a user runs an agent
+holding a fraction of their authority, and that agent spawns sub-agents holding
+a fraction of *its* authority, to any depth. Dovenix needs no agent-sandbox
+subsystem for this, for the same reason it
+[needs no container subsystem](#containers-namespaces-were-never-in-the-kernel-to-begin-with):
+delegation-by-subset is the native spawn path.
+
+- **Nesting is enforced by construction, not policy.** Handles are unforgeable
+  and there is no ambient authority, so a spawned process's maximum reach is
+  exactly the handle set and namespace map its spawner chose to pass — at
+  every depth, with no per-level sandbox policy to get wrong. An agent is a
+  process tree with a narrower namespace map and a `Job` budget (a runaway
+  agent tree is throttled, accounted, and killed as a unit); a sub-agent is
+  the same thing one level down.
+- **Attenuation, not just subsetting.** Useful delegation passes *weakened*
+  capabilities, not merely fewer of them: a read-only view of a directory, a
+  network cap valid only for named hosts, a rate-limited channel. Two
+  mechanisms cover it. Kernel **handle rights** express what the kernel can
+  see (duplicate-with-fewer-rights: read-only, no-transfer; the exact rights
+  model is an [open question](#open-questions)). **Interposition proxies**
+  express semantic attenuation the kernel cannot (filesystem subtree views,
+  host filtering, rate limits) — the same machinery as
+  [L2 record/replay](determinism.md#l2--component-recordreplay-interposition),
+  with the
+  [isolation ladder](#intra-address-space-compartments-mpkpks-and-the-isolation-ladder)
+  pricing where the proxy runs.
+- **Authority is what a process can reach, not what it holds.** A single
+  channel to a powerful server is an amplifier: if a server hands out
+  capabilities by global name on request, the requester's real authority is
+  whatever that server will give it, and the spawn-time subset is fiction.
+  Hence the load-bearing rule: **system servers never act as
+  ambient-authority oracles** — anything an endpoint hands out is derived
+  from and scoped by the requesting connection's namespace map, so reachable
+  authority stays a subset of the spawner's reachable authority at every
+  delegation step.
+- **Escalation is a mediated grant, not a sandbox escape (powerbox).** Agents
+  legitimately need more authority mid-task. The capability-native answer is
+  a trusted, user-owned policy component: the agent asks, the user (or the
+  user's standing policy) confirms, and a fresh narrow capability is minted
+  and passed down the agent's existing channel. Entirely userspace, and it
+  composes with nesting — a sub-agent's request is bounded by each ancestor's
+  grant policy on the way up.
+- **Every agent run is recordable and replayable.** L2 interposition already
+  captures everything a component saw and sent; applied to an agent boundary,
+  that is a complete, exactly-replayable audit of what the agent did.
+  Forensics and "watch the agent" tooling fall out of the determinism
+  machinery instead of a bolted-on audit subsystem.
+- **Revocation is the open problem.** Killing the `Job` subtree revokes
+  everything, coarsely, today. Yanking one grant mid-flight — and everything
+  derived from it down the tree — needs a real design decision
+  ([open question](#open-questions)).
+
 ## Hardware integration: power as a lifecycle, not a bolt-on
 
 - **ACPI** via ACPICA (permissive Intel license branch), wrapped in a userspace
@@ -389,7 +444,14 @@ trivial patches. This metric is a release gate, same as the performance benchmar
 
 - Exact kernel syscall surface and handle rights model (needs its own doc) —
   including the exact shape of the POSIX-driven primitives: COW address-space
-  snapshot for `fork`, thread interruption for signals.
+  snapshot for `fork`, thread interruption for signals — and the
+  attenuation rights [agent delegation](#agents-the-container-substrate-plus-a-grant-model)
+  relies on (duplicate-with-fewer-rights).
+- Capability revocation for
+  [agent delegation](#agents-the-container-substrate-plus-a-grant-model): is
+  kill-the-`Job`-subtree enough, or is fine-grained mid-flight revocation
+  (revocable-by-indirection handles, or an seL4-style capability derivation
+  tree) worth its kernel cost?
 - MPK/PKS compartment policy: which regions get the 16-key budget, and is
   rung 2 ever promoted to a real security boundary (gadget scrubbing + CFI)?
   Own design doc due with the first servers (M2/M3) — see the

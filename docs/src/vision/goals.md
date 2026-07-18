@@ -127,6 +127,17 @@ primitive the whole OS is built on, not a bolted-on kernel feature like Linux
 namespaces. OCI image and runtime compatibility is the goal so existing
 container tooling and registries work.
 
+### Agent operation, natively
+
+AI agents acting on the user's behalf are a design-target workload: an agent
+runs with a **subset of the user's authority, and its sub-agents with a subset
+of that**, enforced at every depth by the capability model itself rather than
+a bolted-on sandbox —
+[delegation is the same spawn path as containers](../design/architecture.md#agents-the-container-substrate-plus-a-grant-model).
+Runtime escalation is a mediated grant (powerbox), and every agent run is
+[recordable and exactly replayable](../design/determinism.md#l2--component-recordreplay-interposition)
+for audit.
+
 ### Easy porting of existing software (POSIX-first)
 
 Existing Linux/BSD/macOS software must port **without unnecessary change** — the
