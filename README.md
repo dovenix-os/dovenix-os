@@ -39,13 +39,26 @@ security as the first design input rather than a retrofit. The design center:
 6. **Modularity** — components are developed, tested, and shipped independently, and the
    OS is adaptable to specific use cases (server, desktop, mobile).
 
-Alongside these, three **first-class platform capabilities** are designed in from the
-start (see [Goals](docs/src/vision/goals.md)): native hardware virtualization (the
-kernel is a type-1 hypervisor by construction, exposed as a public API), native
-containerization (namespace maps + resource-budgeted jobs, OCI-compatible — the
-docker/podman experience without retrofitted kernel namespaces), and proper hardware
-integration (ACPI, sleep/resume, battery, thermal — riding the same driver-lifecycle
-machinery as live update).
+Alongside these, seven **first-class platform capabilities** are designed in from the
+start (see [Goals](docs/src/vision/goals.md)) — each cheap if native, miserable if
+retrofitted:
+
+- **Hardware virtualization** — the kernel is a type-1 hypervisor by construction,
+  exposed as a public API, KVM-class in role.
+- **Containerization** — namespace maps + resource-budgeted jobs, OCI-compatible:
+  the docker/podman experience without retrofitted kernel namespaces.
+- **Agent operation** — AI agents run with a subset of the user's authority and
+  sub-agents with a subset of that, enforced at every depth by the capability model
+  itself; every agent run is recordable and exactly replayable for audit.
+- **Easy porting (POSIX-first)** — source compatibility with zero or trivial
+  patches, per the vision above.
+- **Deterministic development and debugging** — scripted thread interleavings in
+  tests, component record/replay, whole-system deterministic simulation, a
+  production flight recorder.
+- **Real-time capability** — priority inheritance across IPC, budgets, core
+  shielding; the acceptance benchmark is sub-millisecond pro-audio with zero XRuns.
+- **Proper hardware integration** — ACPI, sleep/resume, battery, thermal — riding
+  the same driver-lifecycle machinery as live update.
 
 ## Hardware strategy
 
@@ -68,6 +81,7 @@ Each top-level directory is an independent unit with its own README and license 
 | Directory | Contents |
 |---|---|
 | [`docs/`](docs/) | The Dovenix Book (mdBook) — design docs, this is where the project currently lives |
+| [`plans/`](plans/) | Implementation plans — working documents that sequence the work; the book stays normative |
 | [`kernel/`](kernel/) | The Dovenix kernel (Rust, `no_std`) |
 | [`libs/`](libs/) | Shared libraries: IPC, driver SDK, wire-protocol codecs |
 | [`servers/`](servers/) | Userspace system servers: device manager, VFS, network, POSIX layer |
@@ -83,9 +97,11 @@ The design docs are an [mdBook](https://rust-lang.github.io/mdBook/):
 cd docs && mdbook serve --open
 ```
 
-Start with the [Driver Wire Protocol](docs/src/design/driver-wire-protocol.md) — it is
-the load-bearing interface of the whole system (license boundary, fault isolation,
-live update, and testability all hang off it).
+Start with the [load-bearing principles index](docs/src/design/principles.md) —
+every principle that resolves design questions across the system, one line each,
+linking to where it is specified. The single most load-bearing *interface* is the
+[Driver Wire Protocol](docs/src/design/driver-wire-protocol.md): license boundary,
+fault isolation, live update, and testability all hang off it.
 
 ## License
 
