@@ -198,6 +198,9 @@ completion ring:  depth × C-byte class completion entry
 
 - `depth` is a power of two, negotiated at queue creation.
 - Each index owns a cache line; single producer / single consumer per index.
+- Index publication is release/acquire: the producer's index store is a
+  release, the consumer's index read an acquire — observing an index value
+  guarantees the entries it covers are visible.
 - Indices are free-running (monotonic), masked by `depth - 1` to a slot —
   full vs. empty is unambiguous without a wasted slot.
 - `S` and `C` are fixed constants of the class (per major class version).
@@ -213,9 +216,60 @@ completion ring:  depth × C-byte class completion entry
 
 ### 8.4 Doorbells
 
-Edge signals, both directions. Both sides MUST tolerate spurious wakeups and
-coalesced edges: **index comparison is ground truth**. This is what makes
-polling mode and interrupt mitigation configuration-free client policies.
+Each queue direction has one doorbell
+[Event](architecture.md#kernel-objects-initial-set): submit (client → driver)
+and complete (driver → client). A doorbell is an **edge, not a level, and a
+hint, not the truth**: a signal means "the peer's index may have advanced",
+carries no count or payload, and any number of edges may coalesce into one
+observed wakeup. **Index comparison is ground truth** — a wakeup that finds
+no new entries is normal, and entries found without a wakeup are consumed
+normally. Both sides MUST tolerate spurious and coalesced edges.
+
+The doorbell Event is required to be *latching*: signaling marks it pending,
+and a wait returns immediately — consuming the mark — if an edge has arrived
+since the last wait. The race-freedom argument below rests on this.
+
+**Producer contract.** After advancing its index (a release-store, §8.2), the
+producer MUST signal the corresponding doorbell; the signal orders after the
+index publish, so a consumer woken by the edge observes the new index. One
+signal MAY cover any number of entries published since the last one —
+batching is the expected case, and is producer-side interrupt mitigation in
+its entirety. A skipped signal is a liveness bug (the peer may sleep
+forever); a redundant signal is always safe.
+
+**Consumer contract.** The blocking loop is *wait, then drain to
+index-equality, then repeat*. An entry published while the consumer is still
+draining leaves a pending edge that ends the next wait immediately, so there
+is no lost-wakeup window and no shared "am I sleeping" flag to manage. Work
+per wakeup is bounded by ring contents, never by edge count.
+
+**Polling and mitigation are client policies, not protocol modes.** A
+consumer that never waits and busy-polls the indices is indistinguishable to
+its peer from one that waits: nothing is negotiated, and the producer's
+obligations are unchanged. This is the poll mode granted by the
+[`sched.poll` escape hatch](determinism.md#5-escape-hatches-speed-and-real-time)
+— a doorbell wait is a kernel-mediated schedule point and therefore
+recordable per the
+[determinism invariants](determinism.md#4-day-one-invariants-cannot-be-retrofitted);
+busy-polling forfeits recorded wakeup order on that queue and nothing else.
+Consumer-side mitigation — delaying the wait to take completions in larger
+batches — is likewise local policy. v0 deliberately has **no suppression
+flags** (virtio `EVENT_IDX`-style): they save the producer a signal syscall
+when the peer is polling, at the price of a shared read-write flag protocol
+with its own races and its own adversarial surface (§8.5). If profiles show
+doorbell syscalls on hot paths, that trade reopens (§13).
+
+**Storms.** A hostile or broken peer may signal at maximum rate. Each edge
+costs the ringer a syscall and costs the victim at most one bounded
+wake-check-nothing iteration, so a storm degrades the offender, not the
+victim — §8.5's rule that neither side is crashable, blockable, or hangable
+holds under storm, and conformance suites assert it (§12).
+
+**Teardown.** Doorbells die with the session: after peer crash or
+[revocation](capabilities.md#what-revocation-looks-like-to-the-revoked), a
+doorbell wait MUST terminate with the session's terminal error
+(`ERR_PEER_RESET` / `ERR_REVOKED`), never hang — "ring doorbells stop",
+observed from the wait.
 
 ### 8.5 Trust and validation
 
@@ -303,6 +357,9 @@ compiled into codec crates. Requirements:
 - Exact `DwpStatus` error code space and how driver-class errors extend it.
 - Multi-queue (per-CPU) conventions for `net`/`block` and their interaction with
   quiesce.
+- Producer-side doorbell suppression (virtio `EVENT_IDX`-style), only if
+  profiles on real workloads show signal syscalls on hot data paths (§8.4);
+  unused header-page space leaves room to add it without a layout break.
 - Whether `STATE_SAVE` supports incremental/streamed blobs for drivers with large
   state (e.g., a future GPU class).
 - Power management verbs (suspend/resume overlap with quiesce — same states or
